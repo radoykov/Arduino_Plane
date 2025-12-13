@@ -1,0 +1,5 @@
+# Ignore a file named 'libraries'
+libraries
+
+# Ignore a directory named 'libraries'
+libraries/
