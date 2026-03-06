@@ -1,6 +1,7 @@
-#include "globals.h"
+#include "1_globals.h"
 
-float getPitchAngle(){
+float getPitchAngle()
+{
   unsigned long currentTime = micros();
   float duration = (currentTime - lastPitchTime) / 1e6; // seconds
   lastPitchTime = currentTime;
@@ -14,7 +15,7 @@ float getPitchAngle(){
   degrees += pitch * duration;
 
   // get accelerometer-based pitch angle (gravity reference)
-  float angle = atan2(movement.getX(), movement.getZ()) * RAD_TO_DEG; 
+  float angle = atan2(movement.getX(), movement.getZ()) * RAD_TO_DEG;
 
   // complementary filter: blend gyro integration with accel reference
   degrees = alpha * degrees + (1 - alpha) * angle;

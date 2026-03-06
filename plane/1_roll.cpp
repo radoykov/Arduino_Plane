@@ -1,13 +1,14 @@
-#include "globals.h"
+#include "1_globals.h"
 
-float getRollAngle() {
+float getRollAngle()
+{
   unsigned long currentTime = micros();
-  float duration = (currentTime - lastRollTime) / 1e6;  // seconds
+  float duration = (currentTime - lastRollTime) / 1e6; // seconds
   lastRollTime = currentTime;
 
   movement.update();
 
-  float roll = movement.getRoll();  // gyro pitch rate (°/s)
+  float roll = movement.getRoll(); // gyro pitch rate (°/s)
 
   // integrate gyro pitch rate
   static double degrees = 0;

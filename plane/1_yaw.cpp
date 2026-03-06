@@ -1,15 +1,17 @@
-#include "globals.h"
+#include "1_globals.h"
 
 float gyroZBias = 0;
 
 const float biasUpdateRate = 0.99;
 const float stationaryThreshold = 0.5;
 
-void calibrateYaw() {
+void calibrateYaw()
+{
   float sum = 0;
-  const int N = 200;  // number of samples
+  const int N = 200; // number of samples
 
-  for (int i = 0; i < N; i++) {
+  for (int i = 0; i < N; i++)
+  {
     movement.update();
     sum += movement.getYaw();
     delay(5);
@@ -17,13 +19,16 @@ void calibrateYaw() {
   gyroZBias = sum / N;
 }
 
-void updateBias(float gyroZ) {
-  if (fabs(gyroZ) < stationaryThreshold) {
+void updateBias(float gyroZ)
+{
+  if (fabs(gyroZ) < stationaryThreshold)
+  {
     gyroZBias = biasUpdateRate * gyroZBias + (1.0 - biasUpdateRate) * gyroZ;
   }
 }
 
-float getYawAngle() {
+float getYawAngle()
+{
   unsigned long now = micros();
   float dt = (now - lastYawTime) / 1e6;
   lastYawTime = now;
@@ -39,8 +44,10 @@ float getYawAngle() {
   static float yaw = 0;
   yaw += correctedZ * dt;
 
-  if (yaw > 180) yaw -= 360;
-  if (yaw < -180) yaw += 360;
+  if (yaw > 180)
+    yaw -= 360;
+  if (yaw < -180)
+    yaw += 360;
 
   return yaw;
 }
