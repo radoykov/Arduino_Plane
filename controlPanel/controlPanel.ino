@@ -1,39 +1,39 @@
 #include "ArduinoGraphics.h"
 #include "Arduino_LED_Matrix.h"
 #include <Modulino.h>
-
 #include <WiFiS3.h>
 #include <WiFiUdp.h>
+
 ModulinoKnob knob;
 ArduinoLEDMatrix matrix;
 
-// WiFi config
-const char* WIFI_SSID = "YOUR_SSID";
-const char* WIFI_PASS = "YOUR_PASSWORD";
+// ── WiFi config ───────────────────────────────────────────
+const char* WIFI_SSID = "YOUR_SSID";      // <-- fill in
+const char* WIFI_PASS = "YOUR_PASSWORD";  // <-- fill in
 const int UDP_PORT = 4210;
-const char* GIGA_IP = "192.168.1.XXX";  // set GIGA's static IP here
+const char* GIGA_IP = "192.168.1.100";  // <-- static IP you set on GIGA
 
 WiFiUDP udp;
 unsigned long lastSendTime = 0;
-const unsigned long SEND_INTERVAL_MS = 100;  // send 10x per second
+const unsigned long SEND_INTERVAL_MS = 100;
 
-// Screens
+// ── Screens ───────────────────────────────────────────────
 const char* screenNames[] = { "Engines", "Gears", "Flaps", "Ramp", "Cabin" };
 const int NUM_SCREENS = 5;
 int currentScreen = 0;
 
+// ── Engines ───────────────────────────────────────────────
 int engineValues[2] = { 0, 0 };
 int engineCursor = 0;
 
-// UP/DOWN screens: Gears, Ramp, Cabin
-// index maps: Gears=1, Ramp=3, Cabin=4
-bool updownState[5] = { false, false, false, false, false };  // true=UP false=DOWN
+// ── UP/DOWN screens: index 1=Gears, 3=Ramp, 4=Cabin ─────
+bool updownState[5] = { false, false, false, false, false };
 
-// ── Flaps: 3 flap positions, each can be 0(small) or 1(big) ──
-int flapSelected = 0;  // which flap is cursor on (0,1,2)
+// ── Flaps ─────────────────────────────────────────────────
+int flapSelected = 0;
 bool flapOpen[3] = { false, false, false };
 
-// Click detection
+// ── Click detection ───────────────────────────────────────
 bool lastPressed = false;
 bool waitingSecondClick = false;
 unsigned long firstClickTime = 0;
@@ -41,15 +41,11 @@ const unsigned long DOUBLE_CLICK_MS = 400;
 
 int lastKnobPos = 0;
 
-// WiFi connect
-
-
 bool connectWiFi() {
-  // Show "WiFi..." BEFORE blocking on connection
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
-  matrix.textScrollSpeed(80);  // ← must be inside beginDraw/endDraw
+  matrix.textScrollSpeed(80);
   matrix.textFont(Font_4x6);
   matrix.beginText(12, 1, 0xFFFFFF);
   matrix.println("WiFi...");
@@ -65,30 +61,29 @@ bool connectWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     udp.begin(UDP_PORT);
-
     matrix.beginDraw();
     matrix.clear();
     matrix.stroke(0xFFFFFFFF);
-    matrix.textScrollSpeed(80);  // ← same here
+    matrix.textScrollSpeed(80);
     matrix.textFont(Font_4x6);
     matrix.beginText(12, 1, 0xFFFFFF);
     matrix.println("WiFi OK!");
     matrix.endText(SCROLL_LEFT);
     matrix.endDraw();
-    delay(1500);  // wait for scroll to finish
+    delay(1500);
     return true;
   }
 
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
-  matrix.textScrollSpeed(80);  // ← and here
+  matrix.textScrollSpeed(80);
   matrix.textFont(Font_4x6);
   matrix.beginText(12, 1, 0xFFFFFF);
   matrix.println("No WiFi!");
   matrix.endText(SCROLL_LEFT);
   matrix.endDraw();
-  delay(1500);  // wait for scroll to finish before retry
+  delay(1500);
   return false;
 }
 
@@ -98,18 +93,17 @@ void sendState() {
            "ENG:%d,%d|GEAR:%d|FLAP:%d,%d,%d|RAMP:%d|CABIN:%d",
            engineValues[0],
            engineValues[1],
-           updownState[1] ? 1 : 0,  // Gears
+           updownState[1] ? 1 : 0,
            flapOpen[0] ? 1 : 0,
            flapOpen[1] ? 1 : 0,
            flapOpen[2] ? 1 : 0,
-           updownState[3] ? 1 : 0,  // Ramp
-           updownState[4] ? 1 : 0   // Cabin
-  );
-
+           updownState[3] ? 1 : 0,
+           updownState[4] ? 1 : 0);
   udp.beginPacket(GIGA_IP, UDP_PORT);
   udp.write((uint8_t*)buf, strlen(buf));
   udp.endPacket();
 }
+
 void drawScreenName(const char* name) {
   matrix.beginDraw();
   matrix.clear();
@@ -122,15 +116,15 @@ void drawScreenName(const char* name) {
   matrix.endDraw();
 }
 
-// ENGINES: left number       right number
 void drawEngines() {
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
 
-  // Left digit
   char d[2];
   d[1] = '\0';
+
+  // Left digit
   d[0] = '0' + engineValues[0];
   matrix.textFont(Font_4x6);
   matrix.beginText(0, 1, 0xFFFFFF);
@@ -143,7 +137,7 @@ void drawEngines() {
   matrix.print(d);
   matrix.endText();
 
-  // Cursor dot under active engine
+  // Cursor dot
   int cx = (engineCursor == 0) ? 1 : 9;
   matrix.point(cx, 7);
   matrix.point(cx + 1, 7);
@@ -151,61 +145,18 @@ void drawEngines() {
   matrix.endDraw();
 }
 
-// UP/DOWN: big UP or DOWN text
-// UP   → arrow pointing up   (chevron shape)
-// DOWN → arrow pointing down (chevron shape)
 void drawUpDown(int screenIdx) {
   bool isUp = updownState[screenIdx];
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
-
-  if (isUp) {
-    // Draw UP arrow chevron + "U" label
-    // Arrow tip at top center (col 5-6, row 0)
-    // matrix.point(5, 0);
-    // matrix.point(6, 0);
-    // // Wings spread
-    // matrix.point(3, 2);
-    // matrix.point(4, 1);
-    // matrix.point(7, 1);
-    // matrix.point(8, 2);
-    // // Shaft
-    // matrix.point(5, 1);
-    // matrix.point(6, 1);
-    // matrix.point(5, 2);
-    // matrix.point(6, 2);
-    // matrix.point(5, 3);
-    // matrix.point(6, 3);
-    // Label "UP" small
-    matrix.textFont(Font_4x6);
-    matrix.beginText(0, 1, 0xFFFFFF);
-    matrix.print("UP");
-    matrix.endText();
-  } else {
-    // Draw DOWN arrow chevron + "DN" label
-    // matrix.point(5, 6);
-    // matrix.point(6, 6);
-    // matrix.point(3, 4);
-    // matrix.point(4, 5);
-    // matrix.point(7, 5);
-    // matrix.point(8, 4);
-    // matrix.point(5, 5);
-    // matrix.point(6, 5);
-    // matrix.point(5, 4);
-    // matrix.point(6, 4);
-    // matrix.point(5, 3);
-    // matrix.point(6, 3);
-    matrix.textFont(Font_4x6);
-    matrix.beginText(0, 1, 0xFFFFFF);
-    matrix.print("LOW");
-    matrix.endText();
-  }
-
+  matrix.textFont(Font_4x6);
+  matrix.beginText(0, 1, 0xFFFFFF);
+  matrix.print(isUp ? "UP" : "LOW");
+  matrix.endText();
   matrix.endDraw();
 }
 
-// FLAPS: 3 flap shapes, selected one is bigger
 void drawFlaps() {
   matrix.beginDraw();
   matrix.clear();
@@ -215,24 +166,20 @@ void drawFlaps() {
 
   for (int i = 0; i < 3; i++) {
     int x = flapX[i];
-    bool isSelected = (i == flapSelected);
 
     if (flapOpen[i]) {
-      // Big flap: tall bar from row 1 to row 6
       for (int r = 1; r <= 6; r++) {
         matrix.point(x, r);
         matrix.point(x + 1, r);
       }
     } else {
-      // Small flap: short bar rows 3-5
       for (int r = 3; r <= 5; r++) {
         matrix.point(x, r);
         matrix.point(x + 1, r);
       }
     }
 
-    // Cursor indicator: dot at row 7 under selected flap
-    if (isSelected) {
+    if (i == flapSelected) {
       matrix.point(x, 7);
       matrix.point(x + 1, 7);
     }
@@ -241,46 +188,50 @@ void drawFlaps() {
   matrix.endDraw();
 }
 
-// Master draw dispatcher
 void drawCurrent() {
   switch (currentScreen) {
-    case 0: drawEngines(); break;  // Engines
-    case 1: drawUpDown(1); break;  // Gears
-    case 2: drawFlaps(); break;    // Flaps
-    case 3: drawUpDown(3); break;  // Ramp
-    case 4: drawUpDown(4); break;  // Cabin
+    case 0: drawEngines(); break;
+    case 1: drawUpDown(1); break;
+    case 2: drawFlaps(); break;
+    case 3: drawUpDown(3); break;
+    case 4: drawUpDown(4); break;
   }
 }
 
+bool flapChosen = false;
 void onSingleClick() {
   switch (currentScreen) {
     case 0:
-      // Engines: move cursor between left and right engine
       engineCursor = 1 - engineCursor;
       break;
     case 1:
     case 3:
     case 4:
-      // Gears / Ramp / Cabin: toggle UP/DOWN
       updownState[currentScreen] = !updownState[currentScreen];
       break;
     case 2:
-      // Flaps: move cursor to next flap
+      // If a flap was opened on current position, close all others before moving
+      if (flapChosen) {
+        for (int i = 0; i < 3; i++) {
+          if (i != flapSelected) flapOpen[i] = false;
+        }
+        flapChosen = false;
+      }
       flapSelected = (flapSelected + 1) % 3;
       break;
   }
+
   drawCurrent();
 }
 
 void onKnobChange(int delta) {
   switch (currentScreen) {
     case 0:
-      // Engines: adjust active engine value
       engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9);
       break;
     case 2:
-      // Flaps: knob opens/closes selected flap
       flapOpen[flapSelected] = (delta > 0);
+      flapChosen = (delta > 0);
       break;
   }
   drawCurrent();
@@ -292,12 +243,9 @@ void setup() {
   knob.begin();
   matrix.begin();
 
-  while (!connectWiFi())
-    ;
-
+  // while (!connectWiFi());
 
   lastKnobPos = knob.get();
-
   drawScreenName(screenNames[currentScreen]);
   drawCurrent();
 }
@@ -305,14 +253,12 @@ void setup() {
 void loop() {
   bool pressed = knob.isPressed();
   int knobPos = knob.get();
-
-
   unsigned long now = millis();
 
   // Click detection
   if (!pressed && lastPressed) {
     if (waitingSecondClick && (now - firstClickTime) < DOUBLE_CLICK_MS) {
-      // DOUBLE CLICK → next screen
+      // Double click → next screen
       waitingSecondClick = false;
       currentScreen = (currentScreen + 1) % NUM_SCREENS;
       drawScreenName(screenNames[currentScreen]);
@@ -323,7 +269,7 @@ void loop() {
     }
   }
 
-  // Single click timeout confirmed
+  // Single click timeout
   if (waitingSecondClick && (now - firstClickTime) >= DOUBLE_CLICK_MS) {
     waitingSecondClick = false;
     onSingleClick();
@@ -338,6 +284,7 @@ void loop() {
     onKnobChange(delta);
   }
 
+  // Send WiFi state
   if (WiFi.status() == WL_CONNECTED && now - lastSendTime >= SEND_INTERVAL_MS) {
     lastSendTime = now;
     sendState();
