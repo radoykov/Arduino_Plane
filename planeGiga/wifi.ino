@@ -1,200 +1,137 @@
-#include <WiFi.h>
+
+#include <WiFi.h>       // ← Giga uses WiFi.h  (NOT WiFiS3.h)
 #include <WiFiUdp.h>
+#include "wifi_state.h"
 
-namespace Wifi
-{
-  // ── Credentials ────────────────────────────────────────
-  const char* SSID = "YOUR_SSID";      // <-- fill in (same network as UNO)
-  const char* PASS = "YOUR_PASSWORD";  // <-- fill in
+const char* AP_SSID = "ArduinoGigaWifi";
+const char* AP_PASS = "pesho123";
+const int   UDP_PORT = 4210;
 
-  const int PORT = 4210;
+WiFiUDP udp;
+char    packetBuf[64];
 
-  WiFiUDP udp;
-  char    packetBuf[64];
+// ── received state ──────────────────────────────────────────
+int   wEng[2]  = {0, 0};
+bool  wGear    = false;
+bool  wFlap[3] = {false, false, false};
+bool  wRamp    = false;
+bool  wCabin   = false;
+float wPitch   = 0.0f;
+float wRoll    = 0.0f;
+float wYaw     = 0.0f;
 
-  // ── Received state ──────────────────────────────────────
-  int  eng[2]   = { 0, 0 };
-  bool gear     = false;
-  bool flap[3]  = { false, false, false };
-  bool ramp     = false;
-  bool cabin    = false;
+// ── previous state for edge detection ───────────────────────
+bool prevGear  = false;
+bool prevRamp  = false;
+bool prevCabin = false;
 
-  // ── Previous state (edge detection) ────────────────────
-  bool prevGear  = false;
-  bool prevRamp  = false;
-  bool prevCabin = false;
+// ────────────────────────────────────────────────────────────
+//  PARSE — each packet has exactly one key, so one if-chain
+// ────────────────────────────────────────────────────────────
+void parsePacket(char* data) {
+  int v;
 
-  // ── Non-blocking motor ──────────────────────────────────
-  struct Motor {
-    bool          running    = false;
-    bool          dirFwd     = true;
-    unsigned long startMs    = 0;
-    unsigned long durationMs = 0;
-    int pinEnable, pinIn1, pinIn2;
-  };
-
-  // !! Set correct pins for your GIGA wiring !!
-  //               running  fwd   start  dur   EN   IN1  IN2
-  Motor mGear  = { false,  true,   0,    0,    5,   30,  31 };
-  Motor mRamp  = { false,  true,   0,    0,    8,   32,  33 };
-  Motor mCabin = { false,  true,   0,    0,    9,   34,  35 };
-
-  // ── Parse incoming packet ───────────────────────────────
-  void parsePacket(char* data)
-  {
-    char* p;
-    int   v;
-
-    p = strstr(data, "ENG:");
-    if (p) sscanf(p, "ENG:%d,%d", &eng[0], &eng[1]);
-
-    p = strstr(data, "GEAR:");
-    if (p) { sscanf(p, "GEAR:%d",  &v); gear  = (bool)v; }
-
-    int f0, f1, f2;
-    p = strstr(data, "FLAP:");
-    if (p) {
-      sscanf(p, "FLAP:%d,%d,%d", &f0, &f1, &f2);
-      flap[0] = f0; flap[1] = f1; flap[2] = f2;
+  if (strncmp(data, "PITCH:", 6) == 0) {
+    sscanf(data + 6, "%f", &wPitch);
+    Serial.print("PITCH="); Serial.println(wPitch, 2);
+    return;
+  }
+  if (strncmp(data, "ROLL:", 5) == 0) {
+    sscanf(data + 5, "%f", &wRoll);
+    Serial.print("ROLL="); Serial.println(wRoll, 2);
+    return;
+  }
+  if (strncmp(data, "YAW:", 4) == 0) {
+    sscanf(data + 4, "%f", &wYaw);
+    Serial.print("YAW="); Serial.println(wYaw, 2);
+    return;
+  }
+  if (strncmp(data, "ENG:", 4) == 0) {
+    sscanf(data + 4, "%d,%d", &wEng[0], &wEng[1]);
+    Serial.print("ENG L="); Serial.print(wEng[0]);
+    Serial.print(" R=");    Serial.println(wEng[1]);
+    // apply immediately
+    Eng::leftValue  = map(wEng[0], 0, 9, 0, 255);
+    Eng::rightValue = map(wEng[1], 0, 9, 0, 255);
+    analogWrite(Eng::leftEnable,  Eng::leftValue);
+    analogWrite(Eng::rightEnable, Eng::rightValue);
+    return;
+  }
+  if (strncmp(data, "GEAR:", 5) == 0) {
+    sscanf(data + 5, "%d", &v); wGear = (bool)v;
+    Serial.print("GEAR="); Serial.println(wGear ? "UP" : "DN");
+    if (wGear != prevGear) {
+      prevGear = wGear;
+      wGear ? gearsUp() : gearsDown();
     }
-
-    p = strstr(data, "RAMP:");
-    if (p) { sscanf(p, "RAMP:%d",  &v); ramp  = (bool)v; }
-
-    p = strstr(data, "CABIN:");
-    if (p) { sscanf(p, "CABIN:%d", &v); cabin = (bool)v; }
+    return;
+  }
+  if (strncmp(data, "FLAP:", 5) == 0) {
+    int f0, f1, f2;
+    sscanf(data + 5, "%d,%d,%d", &f0, &f1, &f2);
+    wFlap[0]=f0; wFlap[1]=f1; wFlap[2]=f2;
+    Serial.print("FLAP=");
+    Serial.print(wFlap[0]); Serial.print(",");
+    Serial.print(wFlap[1]); Serial.print(",");
+    Serial.println(wFlap[2]);
+    return;
+  }
+  if (strncmp(data, "RAMP:", 5) == 0) {
+    sscanf(data + 5, "%d", &v); wRamp = (bool)v;
+    Serial.print("RAMP="); Serial.println(wRamp ? "UP" : "DN");
+    if (wRamp != prevRamp) {
+      prevRamp = wRamp;
+      wRamp ? rampUp() : rampDown();
+    }
+    return;
+  }
+  if (strncmp(data, "CABIN:", 6) == 0) {
+    sscanf(data + 6, "%d", &v); wCabin = (bool)v;
+    Serial.print("CABIN="); Serial.println(wCabin ? "UP" : "DN");
+    if (wCabin != prevCabin) {
+      prevCabin = wCabin;
+      wCabin ? cabinOpen() : cabinClose();
+    }
+    return;
   }
 
-  // ── Motor helpers ───────────────────────────────────────
-  void startMotor(Motor& m, bool forward, unsigned long dur)
-  {
-    if (m.running) return;
-    m.running    = true;
-    m.dirFwd     = forward;
-    m.startMs    = millis();
-    m.durationMs = dur;
-    analogWrite (m.pinEnable, 255);
-    digitalWrite(m.pinIn1, forward ? HIGH : LOW);
-    digitalWrite(m.pinIn2, forward ? LOW  : HIGH);
-  }
+  // unknown packet — print raw for debugging
+  Serial.print("[UNKNOWN] "); Serial.println(data);
+}
 
-  void stopMotor(Motor& m)
-  {
-    m.running = false;
-    analogWrite (m.pinEnable, 0);
-    digitalWrite(m.pinIn1, LOW);
-    digitalWrite(m.pinIn2, LOW);
-  }
+// ────────────────────────────────────────────────────────────
+//  SETUP / LOOP
+// ────────────────────────────────────────────────────────────
+bool setupWifi() {
+  Serial.begin(115200);
+  delay(2000);
+  Serial.println("Starting AP...");
 
-  void tickMotor(Motor& m)
-  {
-    if (m.running && (millis() - m.startMs >= m.durationMs))
-      stopMotor(m);
-  }
+  WiFi.beginAP(AP_SSID, AP_PASS);
 
-  // ── Apply engines ───────────────────────────────────────
-  // Maps panel value 0-9 → PWM 0-255
-  // Uses same enable pins as 3_engines.ino
-  void applyEngines()
-  {
-    analogWrite(Eng::leftEnable,  map(eng[0], 0, 9, 0, 255));
-    analogWrite(Eng::rightEnable, map(eng[1], 0, 9, 0, 255));
-  }
-
-  // ── Apply flaps ─────────────────────────────────────────
-  // TODO: attach 3 servos and set their pins
-  // Servo flapServos[3];
-  void applyFlaps()
-  {
-    // flapServos[0].write(flap[0] ? 90 : 0);
-    // flapServos[1].write(flap[1] ? 90 : 0);
-    // flapServos[2].write(flap[2] ? 90 : 0);
-  }
-
-} // namespace Wifi
-
-// ─────────────────────────────────────────────────────────
-// TaskScheduler callbacks
-// ─────────────────────────────────────────────────────────
-
-bool setupWifi()
-{
-  // Motor pins
-  pinMode(Wifi::mGear.pinEnable,  OUTPUT);
-  pinMode(Wifi::mGear.pinIn1,     OUTPUT);
-  pinMode(Wifi::mGear.pinIn2,     OUTPUT);
-  pinMode(Wifi::mRamp.pinEnable,  OUTPUT);
-  pinMode(Wifi::mRamp.pinIn1,     OUTPUT);
-  pinMode(Wifi::mRamp.pinIn2,     OUTPUT);
-  pinMode(Wifi::mCabin.pinEnable, OUTPUT);
-  pinMode(Wifi::mCabin.pinIn1,    OUTPUT);
-  pinMode(Wifi::mCabin.pinIn2,    OUTPUT);
-
-  // Set static IP so UNO always knows where to send
-  // Match this IP with GIGA_IP in controlPanel.ino
-  IPAddress local  (192, 168, 1, 100);  // <-- GIGA static IP
-  IPAddress gateway(192, 168, 1,   1);  // <-- your router (run ipconfig on PC)
-  IPAddress subnet (255, 255, 255,  0);
-  WiFi.config(local, gateway, subnet);
-
-  WiFi.begin(Wifi::SSID, Wifi::PASS);
-
-  // Blocking wait — fine here, scheduler not running yet
   unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000)
+  while (WiFi.status() != WL_AP_LISTENING && millis() - start < 10000)
     delay(500);
 
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("GIGA: WiFi failed");
+  if (WiFi.status() != WL_AP_LISTENING) {
+    Serial.println("AP failed!");
     return false;
   }
 
-  Wifi::udp.begin(Wifi::PORT);
-  Serial.print("GIGA IP: ");
-  Serial.println(WiFi.localIP());  // should print 192.168.1.100
+  udp.begin(UDP_PORT);
+  Serial.print("Giga IP: ");
+  Serial.println(WiFi.localIP());  // confirm what IP to put in controlPanel.ino
+  Serial.println("Waiting for packets...");
   return true;
 }
 
-void loopWifi()
-{
-  using namespace Wifi;
-
-  // 1. Tick motors (replaces delay())
-  tickMotor(mGear);
-  tickMotor(mRamp);
-  tickMotor(mCabin);
-
-  // 2. Read UDP
+void loopWifi() {
   int packetSize = udp.parsePacket();
   if (packetSize <= 0) return;
 
   int len = udp.read(packetBuf, sizeof(packetBuf) - 1);
+  if (len <= 0) return;
   packetBuf[len] = '\0';
+
   parsePacket(packetBuf);
-
-  // 3. React
-
-  // Engines — continuous value, apply every packet
-  applyEngines();
-
-  // Flaps — apply every packet
-  applyFlaps();
-
-  // Gear — only trigger on state change
-  if (gear != prevGear) {
-    prevGear = gear;
-    startMotor(mGear, gear, 8000);   // 8 s → adjust to your motor
-  }
-
-  // Ramp
-  if (ramp != prevRamp) {
-    prevRamp = ramp;
-    startMotor(mRamp, ramp, 4000);   // 4 s → adjust
-  }
-
-  // Cabin
-  if (cabin != prevCabin) {
-    prevCabin = cabin;
-    startMotor(mCabin, cabin, 4300); // 4.3 s → matches original delay
-  }
 }
