@@ -4,7 +4,6 @@
 #include <Modulino.h>
 #include <WiFiS3.h>
 
-// ── network config ──────────────────────────────────────────
 const char* WIFI_SSID = "ArduinoGigaWifi";
 const char* WIFI_PASS = "pesho123";
 const int UDP_PORT = 4210;
@@ -25,16 +24,13 @@ bool setupMovement() {
   return true;
 }
 
-// ── knob + matrix ───────────────────────────────────────────
 ModulinoKnob knob;
 ArduinoLEDMatrix matrix;
 
-// ── screens ─────────────────────────────────────────────────
 const char* screenNames[] = { "Engines", "Gears", "Flaps", "Ramp", "Cabin" };
 const int NUM_SCREENS = 5;
 int currentScreen = 0;
 
-// ── state ───────────────────────────────────────────────────
 int engineValues[2] = { 0, 0 };
 int engineCursor = 0;
 bool updownState[5] = { false, false, false, false, false };
@@ -42,25 +38,19 @@ int flapSelected = 0;
 bool flapOpen[3] = { false, false, false };
 bool flapChosen = false;
 
-// previous state — for change detection
 int prevEngineValues[2] = { -1, -1 };
 bool prevUpdown[5] = { false, false, false, false, false };
 bool prevFlapOpen[3] = { false, false, false };
 
-// ── click logic ─────────────────────────────────────────────
 bool lastPressed = false;
 bool waitingSecondClick = false;
 unsigned long firstClickTime = 0;
 const unsigned long DOUBLE_CLICK_MS = 400;
 int lastKnobPos = 0;
 
-// ── IMU send timing ─────────────────────────────────────────
 unsigned long lastImuSendTime = 0;
 const unsigned long IMU_SEND_INTERVAL = 100;  // ms
 
-// ────────────────────────────────────────────────────────────
-//  WIFI CONNECT
-// ────────────────────────────────────────────────────────────
 void matrixScroll(const char* msg) {
   matrix.beginDraw();
   matrix.clear();
@@ -92,16 +82,12 @@ bool connectWiFi() {
   return false;
 }
 
-// ────────────────────────────────────────────────────────────
-//  SEND HELPERS — each sends ONE named packet
-// ────────────────────────────────────────────────────────────
 void sendPacket(const char* buf) {
   udp.beginPacket(GIGA_IP, UDP_PORT);
   udp.write((const uint8_t*)buf, strlen(buf));
   udp.endPacket();
 }
 
-// Continuous IMU — sent every IMU_SEND_INTERVAL
 void sendPitch() {
   char buf[32];
   snprintf(buf, sizeof(buf), "PITCH:%.2f", getPitchAngle());
@@ -118,7 +104,6 @@ void sendYaw() {
   sendPacket(buf);
 }
 
-// Event-driven — called only when value changes
 void sendEngines() {
   char buf[32];
   snprintf(buf, sizeof(buf), "ENG:%d,%d", engineValues[0], engineValues[1]);
@@ -146,7 +131,6 @@ void sendCabin() {
   sendPacket(buf);
 }
 
-// Check every state field and send only what changed
 void sendChangedEvents() {
   if (engineValues[0] != prevEngineValues[0] || engineValues[1] != prevEngineValues[1]) {
     prevEngineValues[0] = engineValues[0];
@@ -173,9 +157,6 @@ void sendChangedEvents() {
   }
 }
 
-// ────────────────────────────────────────────────────────────
-//  DISPLAY HELPERS
-// ────────────────────────────────────────────────────────────
 void drawScreenName(const char* name) {
   matrixScroll(name);
 }
@@ -235,9 +216,6 @@ void drawCurrent() {
   }
 }
 
-// ────────────────────────────────────────────────────────────
-//  INPUT HANDLERS
-// ────────────────────────────────────────────────────────────
 void onSingleClick() {
   switch (currentScreen) {
     case 0: engineCursor = 1 - engineCursor; break;
@@ -272,9 +250,6 @@ void onKnobChange(int delta) {
   drawCurrent();
 }
 
-// ────────────────────────────────────────────────────────────
-//  SETUP / LOOP
-// ────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
   setupMovement();
@@ -293,7 +268,6 @@ void loop() {
   int knobPos = knob.get();
   unsigned long now = millis();
 
-  // ── double-click / single-click ─────────────────────────
   if (!pressed && lastPressed) {
     if (waitingSecondClick && (now - firstClickTime) < DOUBLE_CLICK_MS) {
       waitingSecondClick = false;
@@ -311,7 +285,6 @@ void loop() {
   }
   lastPressed = pressed;
 
-  // ── knob ────────────────────────────────────────────────
   if (knobPos != lastKnobPos) {
     int delta = knobPos - lastKnobPos;
     lastKnobPos = knobPos;
@@ -319,14 +292,12 @@ void loop() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    // IMU — every 100 ms, three separate packets
     if (now - lastImuSendTime >= IMU_SEND_INTERVAL) {
       lastImuSendTime = now;
       sendPitch();
       sendRoll();
       sendYaw();
     }
-    // Events — only when something changed
     sendChangedEvents();
   }
 

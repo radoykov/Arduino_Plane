@@ -2,9 +2,9 @@
 
 namespace Clutch
 {
-  const int btnPin = 53;
+  const int btnPin   = 53;
   const int servoPin = 4;
-  const int potPin = A7;
+  const int potPin   = A6;  // A7 not available on GIGA, use A6
   Servo servo;
   int value = 0;
 }
@@ -16,7 +16,7 @@ bool setupClutch()
   Clutch::servo.attach(Clutch::servoPin);
   return true;
 }
-// 35 delta; min-23 max-  mid = 53 ///MID TO POSITION 30
+
 void loopClutch()
 {
   Clutch::value = map(analogRead(Clutch::potPin), 0, 1023, 0, 180);

@@ -18,14 +18,16 @@ Task tElements(100, TASK_FOREVER, &loopElements, &runner, false, &setupElements)
 Task tClutch(20, TASK_FOREVER, &loopClutch, &runner, false, &setupClutch);
 Task tServo(20, TASK_FOREVER, &loopServo, &runner, false, &setupServo);
 
-void setup() {
-  tWifi.enable();  // first — starts Serial and AP
+void setup()
+{
+  tWifi.enable();
   tEngines.enable();
   tElements.enable();
   tClutch.enable();
   tServo.enable();
 }
 
-void loop() {
+void loop()
+{
   runner.execute();
 }

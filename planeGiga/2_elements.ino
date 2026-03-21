@@ -1,23 +1,20 @@
-#include "wifi_state.h" 
+#include "wifi_state.h"
 
 namespace Elem
 {
   int mainEnable = 6, mainIn1 = 74, mainIn2 = 75;
   int btnPin     = 53;
 
-  // motor state machine
   bool          motorRunning  = false;
   bool          motorFwd      = true;
   unsigned long motorStartMs  = 0;
   unsigned long motorDuration = 0;
 
-  // logical states
   int isCabinOpen = 0;
   int isRampOpen  = 0;
   int gearsDown   = 0;
 }
 
-// ── non-blocking motor start ──────────────────────────────
 void elemStartMotor(bool forward, unsigned long duration)
 {
   if (Elem::motorRunning) return;
@@ -44,7 +41,6 @@ void elemTickMotor()
     elemStopMotor();
 }
 
-// ── split cabin / gear / ramp into open/close ─────────────
 void cabinOpen()
 {
   if (Elem::isCabinOpen) return;
@@ -99,9 +95,6 @@ bool setupElements()
 void loopElements()
 {
   elemTickMotor();
-
-  // physical button still triggers gears as before
-  if (digitalRead(Elem::btnPin) == HIGH) {
+  if (digitalRead(Elem::btnPin) == HIGH)
     Elem::gearsDown ? gearsUp() : gearsDown();
-  }
 }

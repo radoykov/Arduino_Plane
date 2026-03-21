@@ -4,13 +4,12 @@ namespace Srv
 {
   Servo servo;
   int servoPin = 6;
-  int potPin = A0;
-  int value = 0;
+  int potPin   = A0;
+  int value    = 0;
 }
 
 bool setupServo()
 {
-  Serial.begin(9600);
   Srv::servo.attach(Srv::servoPin);
   return true;
 }

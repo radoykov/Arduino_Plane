@@ -1,10 +1,12 @@
+#include "wifi_state.h"
+
 namespace Eng
 {
-  int leftEnable   = 2,  leftIn1  = 22, leftIn2  = 23;
-  int leftToggle   = 24, leftLed  = 25, leftThrottle  = A0;
-  int rightEnable  = 3,  rightIn1 = 26, rightIn2 = 27;
-  int rightToggle  = 28, rightLed = 29, rightThrottle = A1;
-  int leftValue    = 0,  rightValue = 0;
+  int leftEnable  = 2,  leftIn1  = 22, leftIn2  = 23;
+  int leftToggle  = 24, leftLed  = 25, leftThrottle  = A0;
+  int rightEnable = 3,  rightIn1 = 26, rightIn2 = 27;
+  int rightToggle = 28, rightLed = 29, rightThrottle = A1;
+  int leftValue   = 0,  rightValue = 0;
 }
 
 bool setupEngines()
@@ -24,9 +26,10 @@ bool setupEngines()
 
 void loopEngines()
 {
+  // wifi.ino writes directly to Eng::leftValue/rightValue and analogWrite
+  // physical throttle only runs when wifi sends 0
   if (wEng[0] == 0 && wEng[1] == 0)
   {
-    // left
     Eng::leftValue = map(analogRead(Eng::leftThrottle), 0, 1023, 80, 255);
     if (digitalRead(Eng::leftToggle) == HIGH) {
       digitalWrite(Eng::leftLed, HIGH);
@@ -36,7 +39,6 @@ void loopEngines()
     }
     analogWrite(Eng::leftEnable, Eng::leftValue);
 
-    // right
     Eng::rightValue = map(analogRead(Eng::rightThrottle), 0, 1023, 80, 255);
     if (digitalRead(Eng::rightToggle) == HIGH) {
       digitalWrite(Eng::rightLed, HIGH);
