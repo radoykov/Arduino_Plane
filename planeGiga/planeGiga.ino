@@ -1,6 +1,5 @@
 bool setupEngines();   void loopEngines();
 bool setupElements();  void loopElements();
-// bool setupClutch();    void loopClutch();
 bool setupServo();     void loopServo();
 bool setupWifi();      void loopWifi();
 
@@ -15,7 +14,6 @@ struct Task {
 Task tasks[] = {
   { loopWifi,     setupWifi,     10,   0 },  // WiFi     — 10 ms  (maximum responsiveness)
   { loopServo,    setupServo,    20,  0 },  // Servo    — 20 ms (50 Hz smooth)
-  // { loopClutch,   setupClutch,   20,  0 },  // Clutch   — 20 ms
   { loopEngines,  setupEngines,  50,  0 },  // Engines  — 50 ms
   { loopElements, setupElements, 20,  0 },  // Elements — 20 ms (motor tick)
 };

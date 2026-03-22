@@ -6,54 +6,41 @@
 
 const char *WIFI_SSID = "ArduinoGigaWifi";
 const char *WIFI_PASS = "pesho123";
-const int UDP_PORT = 4210;
-const char *GIGA_IP = "192.168.3.1"; // default AP address for Giga
+const int   UDP_PORT  = 4210;
+const char *GIGA_IP   = "192.168.3.1";
 
 WiFiUDP udp;
-
 ModulinoMovement movement;
-unsigned long lastPitchTime, lastRollTime, lastYawTime;
-float alpha;
-
-bool setupMovement()
-{
-  Modulino.begin();
-  movement.begin();
-  lastPitchTime = lastRollTime = lastYawTime = micros();
-  alpha = 0.95;
-  calibrateYaw();
-  return true;
-}
-
 ModulinoKnob knob;
 ArduinoLEDMatrix matrix;
 
-const char *screenNames[] = {"Engines", "Gears", "Flaps", "Ramp", "Cabin"};
+float alpha;
+unsigned long lastPitchTime, lastRollTime, lastYawTime;
+
+const char *screenNames[] = { "Engines", "Gears", "Flaps", "Ramp", "Cabin" };
 const int NUM_SCREENS = 5;
 int currentScreen = 0;
 
-int engineValues[2] = {0, 0};
-int engineCursor = 0;
-bool updownState[5] = {false, false, false, false, false};
-int flapSelected = 0;
-bool flapOpen[3] = {false, false, false};
-bool flapChosen = false;
+int  engineValues[2] = { 0, 0 };
+int  engineCursor    = 0;
+bool updownState[5]  = { false, false, false, false, false };
+int  flapSelected    = 0;   // 0, 1, 2
 
-int prevEngineValues[2] = {-1, -1};
-bool prevUpdown[5] = {false, false, false, false, false};
-bool prevFlapOpen[3] = {false, false, false};
+int  prevEngineValues[2] = { -1, -1 };
+bool prevUpdown[5]       = { false, false, false, false, false };
+int  prevFlapSelected    = -1;
 
-bool lastPressed = false;
-bool waitingSecondClick = false;
-unsigned long firstClickTime = 0;
-const unsigned long DOUBLE_CLICK_MS = 400;
-int lastKnobPos = 0;
+bool          lastPressed     = false;
+int           pendingClicks   = 0;
+unsigned long lastClickTime   = 0;
+const unsigned long CLICK_WIN = 400;
 
 unsigned long lastImuSendTime = 0;
-const unsigned long IMU_SEND_INTERVAL = 100; // ms
+const unsigned long IMU_SEND_INTERVAL = 100;
 
-void matrixScroll(const char *msg)
-{
+int lastKnobPos = 0;
+
+void matrixScroll(const char *msg) {
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
@@ -65,134 +52,22 @@ void matrixScroll(const char *msg)
   matrix.endDraw();
 }
 
-bool connectWiFi()
-{
-  matrixScroll("WiFi...");
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20)
-  {
-    delay(500);
-    attempts++;
-  }
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    udp.begin(UDP_PORT);
-    matrixScroll("WiFi OK!");
-    delay(1500);
-    return true;
-  }
-  matrixScroll("No WiFi!");
-  delay(1500);
-  return false;
-}
-
-void sendPacket(const char *buf)
-{
-  udp.beginPacket(GIGA_IP, UDP_PORT);
-  udp.write((const uint8_t *)buf, strlen(buf));
-  udp.endPacket();
-}
-
-void sendPitchRollYaw()
-{
-  char buf[96];
-  snprintf(buf, sizeof(buf), "PITCH:%.2f|ROLL:%.2f|YAW:%.2f", getPitchAngle(), getRollAngle(), getYawAngle());
-  sendPacket(buf);
-}
-
-void sendEngines()
-{
-  char buf[32];
-  snprintf(buf, sizeof(buf), "ENG:%d,%d", engineValues[0], engineValues[1]);
-  sendPacket(buf);
-}
-void sendGear()
-{
-  char buf[16];
-  snprintf(buf, sizeof(buf), "GEAR:%d", updownState[1] ? 1 : 0);
-  sendPacket(buf);
-}
-void sendFlap()
-{
-  char buf[24];
-  snprintf(buf, sizeof(buf), "FLAP:%d,%d,%d",
-           flapOpen[0] ? 1 : 0, flapOpen[1] ? 1 : 0, flapOpen[2] ? 1 : 0);
-  sendPacket(buf);
-}
-void sendRamp()
-{
-  char buf[16];
-  snprintf(buf, sizeof(buf), "RAMP:%d", updownState[3] ? 1 : 0);
-  sendPacket(buf);
-}
-void sendCabin()
-{
-  char buf[16];
-  snprintf(buf, sizeof(buf), "CABIN:%d", updownState[4] ? 1 : 0);
-  sendPacket(buf);
-}
-
-void sendChangedEvents()
-{
-  if (engineValues[0] != prevEngineValues[0] || engineValues[1] != prevEngineValues[1])
-  {
-    prevEngineValues[0] = engineValues[0];
-    prevEngineValues[1] = engineValues[1];
-    sendEngines();
-  }
-  if (updownState[1] != prevUpdown[1])
-  {
-    prevUpdown[1] = updownState[1];
-    sendGear();
-  }
-  if (flapOpen[0] != prevFlapOpen[0] || flapOpen[1] != prevFlapOpen[1] || flapOpen[2] != prevFlapOpen[2])
-  {
-    prevFlapOpen[0] = flapOpen[0];
-    prevFlapOpen[1] = flapOpen[1];
-    prevFlapOpen[2] = flapOpen[2];
-    sendFlap();
-  }
-  if (updownState[3] != prevUpdown[3])
-  {
-    prevUpdown[3] = updownState[3];
-    sendRamp();
-  }
-  if (updownState[4] != prevUpdown[4])
-  {
-    prevUpdown[4] = updownState[4];
-    sendCabin();
-  }
-}
-
-void drawScreenName(const char *name)
-{
-  matrixScroll(name);
-}
-
-void drawEngines()
-{
+void drawEngines() {
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
-  char d[2];
-  d[1] = '\0';
-  d[0] = '0' + engineValues[0];
   matrix.textFont(Font_4x6);
-  matrix.beginText(0, 1, 0xFFFFFF);
-  matrix.print(d);
-  matrix.endText();
+  char d[2] = { 0, '\0' };
+  d[0] = '0' + engineValues[0];
+  matrix.beginText(0, 1, 0xFFFFFF); matrix.print(d); matrix.endText();
   d[0] = '0' + engineValues[1];
-  matrix.beginText(8, 1, 0xFFFFFF);
-  matrix.print(d);
-  matrix.endText();
+  matrix.beginText(8, 1, 0xFFFFFF); matrix.print(d); matrix.endText();
   int cx = (engineCursor == 0) ? 1 : 9;
-  matrix.point(cx, 7);
-  matrix.point(cx + 1, 7);
+  matrix.point(cx, 7); matrix.point(cx + 1, 7);
   matrix.endDraw();
 }
-void drawUpDown(int idx)
-{
+
+void drawUpDown(int idx) {
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
@@ -202,144 +77,189 @@ void drawUpDown(int idx)
   matrix.endText();
   matrix.endDraw();
 }
-void drawFlaps()
-{
+
+void drawFlaps() {
   matrix.beginDraw();
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
-  char d[2];
-  d[0] = '0' + flapSelected + 1;
-  d[1] = '\0';
   matrix.textFont(Font_4x6);
-  matrix.beginText(4, 1, 0xFFFFFF);
-  matrix.print(d);
-  matrix.endText();
-  matrix.point(4, 7);
-  matrix.point(5, 7);
+  char d[2] = { (char)('0' + flapSelected + 1), '\0' };
+  matrix.beginText(4, 1, 0xFFFFFF); matrix.print(d); matrix.endText();
+  matrix.point(4, 7); matrix.point(5, 7);
   matrix.endDraw();
 }
-void drawCurrent()
-{
-  switch (currentScreen)
-  {
-  case 0:
-    drawEngines();
-    break;
-  case 1:
-    drawUpDown(1);
-    break;
-  case 2:
-    drawFlaps();
-    break;
-  case 3:
-    drawUpDown(3);
-    break;
-  case 4:
-    drawUpDown(4);
-    break;
+
+void drawCurrent() {
+  switch (currentScreen) {
+    case 0: drawEngines();  break;
+    case 1: drawUpDown(1);  break;
+    case 2: drawFlaps();    break;
+    case 3: drawUpDown(3);  break;
+    case 4: drawUpDown(4);  break;
   }
 }
 
-void onSingleClick()
-{
-  switch (currentScreen)
-  {
-  case 0:
-    engineCursor = 1 - engineCursor;
-    break;
-  case 1:
-  case 3:
-  case 4:
-    updownState[currentScreen] = !updownState[currentScreen];
-    break;
-  case 2:
-    if (flapChosen)
-    {
-      for (int i = 0; i < 3; i++)
-        if (i != flapSelected)
-          flapOpen[i] = false;
-      flapChosen = false;
-    }
-    flapSelected = (flapSelected + 1) % 3;
-    break;
+bool connectWiFi() {
+  matrixScroll("WiFi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    attempts++;
   }
-  drawCurrent();
+  if (WiFi.status() == WL_CONNECTED) {
+    udp.begin(UDP_PORT);
+    matrixScroll("OK!");
+    delay(1000);
+    return true;
+  }
+  matrixScroll("Fail!");
+  delay(1000);
+  return false;
 }
-void onKnobChange(int delta)
-{
-  switch (currentScreen)
-  {
-  case 0:
-    engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9);
-    break;
-  case 2:
-    flapSelected = constrain(flapSelected + delta, 0, 2);
-    flapOpen[0] = flapOpen[1] = flapOpen[2] = false;
-    flapOpen[flapSelected] = true;
-    flapChosen = true;
-    break;
+
+void sendPacket(const char *buf) {
+  udp.beginPacket(GIGA_IP, UDP_PORT);
+  udp.write((const uint8_t *)buf, strlen(buf));
+  udp.endPacket();
+}
+
+void sendPitchRollYaw() {
+  char buf[64];
+  snprintf(buf, sizeof(buf), "PITCH:%d|ROLL:%d|YAW:%d",
+           (int)getPitchAngle(), (int)getRollAngle(), (int)getYawAngle());
+  sendPacket(buf);
+}
+
+void sendEngines() {
+  char buf[32];
+  snprintf(buf, sizeof(buf), "ENG:%d,%d", engineValues[0], engineValues[1]);
+  sendPacket(buf);
+}
+
+void sendGear() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "GEAR:%d", updownState[1] ? 1 : 0);
+  sendPacket(buf);
+}
+
+void sendFlap() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "FLAP:%d", flapSelected);
+  sendPacket(buf);
+}
+
+void sendRamp() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "RAMP:%d", updownState[3] ? 1 : 0);
+  sendPacket(buf);
+}
+
+void sendCabin() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "CABIN:%d", updownState[4] ? 1 : 0);
+  sendPacket(buf);
+}
+
+void sendChangedEvents() {
+  if (engineValues[0] != prevEngineValues[0] || engineValues[1] != prevEngineValues[1]) {
+    prevEngineValues[0] = engineValues[0];
+    prevEngineValues[1] = engineValues[1];
+    sendEngines();
+  }
+  if (updownState[1] != prevUpdown[1]) { prevUpdown[1] = updownState[1]; sendGear();  }
+  if (updownState[3] != prevUpdown[3]) { prevUpdown[3] = updownState[3]; sendRamp();  }
+  if (updownState[4] != prevUpdown[4]) { prevUpdown[4] = updownState[4]; sendCabin(); }
+  if (flapSelected != prevFlapSelected) {
+    prevFlapSelected = flapSelected;
+    sendFlap();
+  }
+}
+
+void onSingleClick() {
+  switch (currentScreen) {
+    case 0: engineCursor   = 1 - engineCursor;  break;
+    case 1: updownState[1] = !updownState[1];   break;
+    case 3: updownState[3] = !updownState[3];   break;
+    case 4: updownState[4] = !updownState[4];   break;
   }
   drawCurrent();
 }
 
-void setup()
-{
+void onDoubleClick() {
+  currentScreen = (currentScreen + 1) % NUM_SCREENS;
+  matrixScroll(screenNames[currentScreen]);
+  drawCurrent();
+}
+
+void onTripleClick() {
+  currentScreen = (currentScreen - 1 + NUM_SCREENS) % NUM_SCREENS;
+  matrixScroll(screenNames[currentScreen]);
+  drawCurrent();
+}
+
+void dispatchClicks(int count) {
+  if      (count == 1) onSingleClick();
+  else if (count == 2) onDoubleClick();
+  else if (count >= 3) onTripleClick();
+}
+
+bool setupMovement() {
+  Modulino.begin();
+  movement.begin();
+  lastPitchTime = lastRollTime = lastYawTime = micros();
+  alpha = 0.95;
+  calibrateYaw();
+  return true;
+}
+
+void setup() {
   Serial.begin(115200);
   setupMovement();
-  Modulino.begin();
   knob.begin();
   matrix.begin();
-  while (!connectWiFi())
-    ;
+  while (!connectWiFi());
   lastKnobPos = knob.get();
-  drawScreenName(screenNames[currentScreen]);
+  matrixScroll(screenNames[currentScreen]);
   drawCurrent();
 }
 
-void loop()
-{
+void loop() {
   bool pressed = knob.isPressed();
-  int knobPos = knob.get();
+  int  knobPos = knob.get();
   unsigned long now = millis();
 
-  if (!pressed && lastPressed)
-  {
-    if (waitingSecondClick && (now - firstClickTime) < DOUBLE_CLICK_MS)
-    {
-      waitingSecondClick = false;
-      currentScreen = (currentScreen + 1) % NUM_SCREENS;
-      drawScreenName(screenNames[currentScreen]);
-      drawCurrent();
-    }
-    else
-    {
-      waitingSecondClick = true;
-      firstClickTime = now;
-    }
+  if (!pressed && lastPressed) {
+    pendingClicks++;
+    lastClickTime = now;
   }
-  if (waitingSecondClick && (now - firstClickTime) >= DOUBLE_CLICK_MS)
-  {
-    waitingSecondClick = false;
-    onSingleClick();
+  if (pendingClicks > 0 && (now - lastClickTime) >= CLICK_WIN) {
+    dispatchClicks(pendingClicks);
+    pendingClicks = 0;
   }
   lastPressed = pressed;
 
-  if (knobPos != lastKnobPos)
-  {
+  if (knobPos != lastKnobPos) {
     int delta = knobPos - lastKnobPos;
     lastKnobPos = knobPos;
-    onKnobChange(delta);
+    switch (currentScreen) {
+      case 0:
+        engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9);
+        break;
+      case 2:
+        flapSelected = constrain(flapSelected + delta, 0, 2);
+        break;
+    }
+    drawCurrent();
   }
 
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    if (now - lastImuSendTime >= IMU_SEND_INTERVAL)
-    {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (now - lastImuSendTime >= IMU_SEND_INTERVAL) {
       lastImuSendTime = now;
       sendPitchRollYaw();
     }
     sendChangedEvents();
   }
-  // HERE DELAY !!! NOT OVERLOAD CPU
+
   delay(10);
 }

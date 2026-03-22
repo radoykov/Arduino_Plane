@@ -24,7 +24,6 @@ void parsePacket(char *data)
   }
   if (strncmp(data, "ENG:", 4) == 0)
   {
-    int raw0, raw1;
     sscanf(data + 4, "%d,%d", &wEngine.left, &wEngine.right);
     return;
   }
@@ -35,14 +34,11 @@ void parsePacket(char *data)
     return;
   }
   if (strncmp(data, "FLAP:", 5) == 0)
-  {
-    int f0, f1, f2;
-    sscanf(data + 5, "%d,%d,%d", &f0, &f1, &f2);
-    wElement.flap[0] = f0;
-    wElement.flap[1] = f1;
-    wElement.flap[2] = f2;
+{
+    sscanf(data + 5, "%d", &v);    
+    wElement.flap = (bool)v;         
     return;
-  }
+}
   if (strncmp(data, "RAMP:", 5) == 0)
   {
     sscanf(data + 5, "%d", &v);

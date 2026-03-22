@@ -19,10 +19,15 @@ struct ElementState {
   bool gear  = false;  // false = down,  true = up
   bool ramp  = false;  // false = closed, true = open
   bool cabin = false;  // false = closed, true = open
-  bool flap[3] = {false, false, false};
+  int flap; // 1 , 2 , 3
 };
 
 // Single global instances
 extern ServoState   wServo;
 extern EngineState  wEngine;
 extern ElementState wElement;
+
+extern void setRamp();
+extern void setBlades();
+extern void setGears();
+extern void setCabin();

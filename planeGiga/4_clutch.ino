@@ -1,20 +1,27 @@
 #include <Servo.h>
+#include "wifi_state.h"
 
-namespace Clutch
+namespace ClutchGearsCabin
 {
-  const int servoPin = 4;
+  const int servoPin = 5;
+  Servo servo;
+  int value = 0;
+}
+namespace ClutchRampBlades
+{
+  const int servoPin = 6;
   Servo servo;
   int value = 0;
 }
 
 bool setupClutch()
 {
-  pinMode(Clutch::potPin, INPUT);
-  Clutch::servo.attach(Clutch::servoPin);
+  ClutchGearsCabin::servo.attach(ClutchGearsCabin::servoPin);
+  ClutchRampBlades::servo.attach(ClutchRampBlades::servoPin);
   return true;
 }
 
-void loopClutch()
-{
-  Clutch::servo.write(map(Clutch::value, 0, 1023, 80, 110));
-}
+void setRamp()  {ClutchRampBlades::servo.write(110);}
+void setBlades()  {ClutchRampBlades::servo.write(70);}
+void setGears() {ClutchGearsCabin::servo.write(89);}
+void setCabin() {ClutchGearsCabin::servo.write(99);}

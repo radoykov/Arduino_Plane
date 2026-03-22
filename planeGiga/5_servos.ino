@@ -6,9 +6,9 @@ Servo pitch;
 Servo roll;
 Servo yaw;
 
-const int pitchPin = 2;
-const int rollPin = 3;
-const int yawPin = 5;
+const int pitchPin = 7;
+const int rollPin = 8;
+const int yawPin = 9;
 }
 
 bool setupServo() {
@@ -20,9 +20,9 @@ bool setupServo() {
 
 void loopServo() {
   // wServo values are –90…+90; add 90 to map to 0…180 servo range.
-  Srv::pitch.write(constrain(wServo.roll + 90, 0, 180));
-  Srv::roll.write(constrain(wServo.roll + 90, 0, 180));
-  Srv::yaw.write(constrain(wServo.yaw + 90, 0, 180));
+  Srv::pitch.write(wServo.pitch + 90);
+  Srv::roll.write(wServo.roll + 90);
+  Srv::yaw.write(wServo.yaw + 90);
 
-  Serial.println(constrain(wServo.pitch + 90, 0, 180));
+  Serial.println(wServo.pitch + 90);
 }
