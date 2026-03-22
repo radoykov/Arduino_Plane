@@ -2,50 +2,67 @@
 
 namespace Eng
 {
-  int leftEnable  = 2,  leftIn1  = 22, leftIn2  = 23;
-  int leftToggle  = 24, leftLed  = 25, leftThrottle  = A0;
-  int rightEnable = 3,  rightIn1 = 26, rightIn2 = 27;
-  int rightToggle = 28, rightLed = 29, rightThrottle = A1;
-  int leftValue   = 0,  rightValue = 0;
+  const int leftEnable = 2;
+  const int leftIn1 = 22;
+  const int leftIn2 = 23;
+  const int leftToggle = 24;
+  const int leftThrottle = A0;
+  const int rightEnable = 3;
+  const int rightIn1 = 26;
+  const int rightIn2 = 27;
+  const int rightToggle = 28;
+  const int rightThrottle = A1;
 }
 
 bool setupEngines()
 {
-  pinMode(Eng::leftEnable,  OUTPUT);
+  pinMode(Eng::leftEnable, OUTPUT);
   pinMode(Eng::rightEnable, OUTPUT);
-  pinMode(Eng::leftIn1,     OUTPUT);
-  pinMode(Eng::leftIn2,     OUTPUT);
-  pinMode(Eng::rightIn1,    OUTPUT);
-  pinMode(Eng::rightIn2,    OUTPUT);
-  digitalWrite(Eng::leftIn1,  HIGH);
-  digitalWrite(Eng::leftIn2,  LOW);
-  digitalWrite(Eng::rightIn1, LOW);
-  digitalWrite(Eng::rightIn2, HIGH);
+  pinMode(Eng::leftIn1, OUTPUT);
+  pinMode(Eng::leftIn2, OUTPUT);
+  pinMode(Eng::rightIn1, OUTPUT);
+  pinMode(Eng::rightIn2, OUTPUT);
+  pinMode(Eng::leftToggle, INPUT);
+  pinMode(Eng::rightToggle, INPUT);
+  // Fixed forward direction
+  digitalWrite(Eng::leftIn1, HIGH);
+  digitalWrite(Eng::leftIn2, LOW);
+  digitalWrite(Eng::rightIn1, HIGH);
+  digitalWrite(Eng::rightIn2, LOW);
   return true;
 }
 
+const MIN_NUM = 80; // MIN !
+
+long val1, val2;
+
 void loopEngines()
 {
-  // wifi.ino writes directly to Eng::leftValue/rightValue and analogWrite
-  // physical throttle only runs when wifi sends 0
-  if (wEng[0] == 0 && wEng[1] == 0)
-  {
-    Eng::leftValue = map(analogRead(Eng::leftThrottle), 0, 1023, 80, 255);
-    if (digitalRead(Eng::leftToggle) == HIGH) {
-      digitalWrite(Eng::leftLed, HIGH);
-    } else {
-      Eng::leftValue = 0;
-      digitalWrite(Eng::leftLed, LOW);
-    }
-    analogWrite(Eng::leftEnable, Eng::leftValue);
+  val1 = map(wEngine.left, 0, 9, MIN_NUM, 255);
+  val2 = map(wEngine.right, 0, 9, MIN_NUM, 255);
 
-    Eng::rightValue = map(analogRead(Eng::rightThrottle), 0, 1023, 80, 255);
-    if (digitalRead(Eng::rightToggle) == HIGH) {
-      digitalWrite(Eng::rightLed, HIGH);
-    } else {
-      Eng::rightValue = 0;
-      digitalWrite(Eng::rightLed, LOW);
-    }
-    analogWrite(Eng::rightEnable, Eng::rightValue);
+  if (val1 <= MIN_NUM)
+  {
+    digitalWrite(Eng::leftIn1, LOW);
+    digitalWrite(Eng::leftIn2, LOW);
   }
+  else if (val2 <= MIN_NUM)
+  {
+    digitalWrite(Eng::rightIn1, LOW);
+    digitalWrite(Eng::rightIn2, LOW);
+  }
+
+  if (Eng::leftIn1 == LOW && Eng::leftIn2 == LOW)
+  {
+    digitalWrite(Eng::leftIn1, HIGH);
+    digitalWrite(Eng::leftIn2, LOW);
+  }
+  else if (Eng::rightIn1 == LOW && Eng::rightIn2 == LOW)
+  {
+    digitalWrite(Eng::rightIn1, HIGH);
+    digitalWrite(Eng::rightIn2, LOW);
+  }
+
+  analogWrite(Eng::leftEnable, val1);
+  analogWrite(Eng::rightEnable, val2);
 }

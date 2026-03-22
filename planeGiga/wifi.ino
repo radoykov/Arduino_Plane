@@ -2,129 +2,80 @@
 #include <WiFiUdp.h>
 #include "wifi_state.h"
 
-// forward declarations from 2_elements.ino
-void gearsUp();
-void gearsDown();
-void cabinOpen();
-void cabinClose();
-void rampUp();
-void rampDown();
+ServoState wServo;
+EngineState wEngine;
+ElementState wElement;
 
 const char *AP_SSID = "ArduinoGigaWifi";
 const char *AP_PASS = "pesho123";
 const int UDP_PORT = 4210;
 
 WiFiUDP udp;
-char packetBuf[128];
-
-int wEng[2] = {0, 0};
-bool wGear = false;
-bool wFlap[3] = {false, false, false};
-bool wRamp = false;
-bool wCabin = false;
-float wPitch = 0.0f;
-float wRoll = 0.0f;
-float wYaw = 0.0f;
-
-bool prevGear = false;
-bool prevRamp = false;
-bool prevCabin = false;
+char packetBuf[64];
 
 void parsePacket(char *data)
 {
-  char *p;
   int v;
 
-  p = strstr(data, "ENG:");
-  if (p)
+  if (strncmp(data, "PITCH:", 6) == 0)
   {
-    sscanf(p, "ENG:%d,%d", &wEng[0], &wEng[1]);
-    Eng::leftValue = map(wEng[0], 0, 9, 0, 255);
-    Eng::rightValue = map(wEng[1], 0, 9, 0, 255);
-    analogWrite(Eng::leftEnable, Eng::leftValue);
-    analogWrite(Eng::rightEnable, Eng::rightValue);
+    sscanf(data, "PITCH:%f|ROLL:%f|YAW:%f", &wServo.pitch, &wServo.roll, &wServo.yaw);
+    return;
   }
-
-  p = strstr(data, "GEAR:");
-  if (p)
+  if (strncmp(data, "ENG:", 4) == 0)
   {
-    sscanf(p, "GEAR:%d", &v);
-    wGear = (bool)v;
-    if (wGear != prevGear)
-    {
-      prevGear = wGear;
-      wGear ? gearsUp() : gearsDown();
-    }
+    int raw0, raw1;
+    sscanf(data + 4, "%d,%d", &wEngine.left, &wEngine.right);
+    return;
   }
-
-  int f0, f1, f2;
-  p = strstr(data, "FLAP:");
-  if (p)
+  if (strncmp(data, "GEAR:", 5) == 0)
   {
-    sscanf(p, "FLAP:%d,%d,%d", &f0, &f1, &f2);
-    wFlap[0] = f0;
-    wFlap[1] = f1;
-    wFlap[2] = f2;
+    sscanf(data + 5, "%d", &v);
+    wElement.gear = (bool)v;
+    return;
   }
-
-  p = strstr(data, "RAMP:");
-  if (p)
+  if (strncmp(data, "FLAP:", 5) == 0)
   {
-    sscanf(p, "RAMP:%d", &v);
-    wRamp = (bool)v;
-    if (wRamp != prevRamp)
-    {
-      prevRamp = wRamp;
-      wRamp ? rampUp() : rampDown();
-    }
+    int f0, f1, f2;
+    sscanf(data + 5, "%d,%d,%d", &f0, &f1, &f2);
+    wElement.flap[0] = f0;
+    wElement.flap[1] = f1;
+    wElement.flap[2] = f2;
+    return;
   }
-
-  p = strstr(data, "CABIN:");
-  if (p)
+  if (strncmp(data, "RAMP:", 5) == 0)
   {
-    sscanf(p, "CABIN:%d", &v);
-    wCabin = (bool)v;
-    if (wCabin != prevCabin)
-    {
-      prevCabin = wCabin;
-      wCabin ? cabinOpen() : cabinClose();
-    }
+    sscanf(data + 5, "%d", &v);
+    wElement.ramp = (bool)v;
+    return;
   }
-
-  p = strstr(data, "PITCH:");
-  if (p)
-    sscanf(p, "PITCH:%f", &wPitch);
-
-  p = strstr(data, "ROLL:");
-  if (p)
-    sscanf(p, "ROLL:%f", &wRoll);
-
-  p = strstr(data, "YAW:");
-  if (p)
-    sscanf(p, "YAW:%f", &wYaw);
+  if (strncmp(data, "CABIN:", 6) == 0)
+  {
+    sscanf(data + 6, "%d", &v);
+    wElement.cabin = (bool)v;
+    return;
+  }
 }
 
 bool setupWifi()
 {
-  Serial.begin(115200);
-  delay(2000);
   Serial.println("Starting AP...");
-
   WiFi.beginAP(AP_SSID, AP_PASS);
 
   unsigned long start = millis();
-  while (WiFi.status() != WL_AP_LISTENING && millis() - start < 10000)
-    delay(500);
-
-  if (WiFi.status() != WL_AP_LISTENING)
+  while (WiFi.status() != WL_AP_LISTENING)
   {
-    Serial.println("AP failed");
-    return false;
+    if (millis() - start > 10000)
+    {
+      Serial.println("AP failed!");
+      return false;
+    }
   }
 
   udp.begin(UDP_PORT);
-  Serial.print("GIGA IP: ");
+  Serial.print("Giga IP: ");
   Serial.println(WiFi.localIP());
+  Serial.println("Ready.");
   return true;
 }
 
@@ -134,20 +85,10 @@ void loopWifi()
   if (packetSize <= 0)
     return;
 
-  memset(packetBuf, 0, sizeof(packetBuf));
   int len = udp.read(packetBuf, sizeof(packetBuf) - 1);
   if (len <= 0)
     return;
   packetBuf[len] = '\0';
 
-  // ← removed the ENG: filter that was killing everything else
-
   parsePacket(packetBuf);
-
-  Serial.print("P:");
-  Serial.print(wPitch, 2);
-  Serial.print(" R:");
-  Serial.print(wRoll, 2);
-  Serial.print(" Y:");
-  Serial.println(wYaw, 2);
 }
