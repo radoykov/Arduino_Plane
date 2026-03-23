@@ -18,7 +18,7 @@ bool setupEngines() {
   pinMode(Eng::rightIn2, OUTPUT);
 
   // Fixed forward direction
-  void setBlades();
+  setBlades();
   digitalWrite(Eng::leftIn1, LOW);
   digitalWrite(Eng::leftIn2, HIGH);
   digitalWrite(Eng::rightIn1, HIGH);

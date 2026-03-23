@@ -19,7 +19,7 @@ struct ElementState {
   bool gear  = false;  // false = down,  true = up
   bool ramp  = false;  // false = closed, true = open
   bool cabin = false;  // false = closed, true = open
-  int flap; // 1 , 2 , 3
+  int flap = 1; // 1 , 2 , 3
 };
 
 // Single global instances

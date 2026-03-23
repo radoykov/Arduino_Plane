@@ -19,7 +19,7 @@ void parsePacket(char *data)
 
   if (strncmp(data, "PITCH:", 6) == 0)
   {
-    sscanf(data, "PITCH:%f|ROLL:%f|YAW:%f", &wServo.pitch, &wServo.roll, &wServo.yaw);
+    sscanf(data, "PITCH:%d|ROLL:%d|YAW:%d", &wServo.pitch, &wServo.roll, &wServo.yaw);
     return;
   }
   if (strncmp(data, "ENG:", 4) == 0)
@@ -36,7 +36,7 @@ void parsePacket(char *data)
   if (strncmp(data, "FLAP:", 5) == 0)
 {
     sscanf(data + 5, "%d", &v);    
-    wElement.flap = (bool)v;         
+    wElement.flap = v;         
     return;
 }
   if (strncmp(data, "RAMP:", 5) == 0)

@@ -261,5 +261,5 @@ void loop() {
     sendChangedEvents();
   }
 
-  delay(10);
+  // delay(2);
 }
