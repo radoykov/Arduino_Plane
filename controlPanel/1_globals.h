@@ -6,7 +6,8 @@ extern unsigned long lastPitchTime;
 extern unsigned long lastRollTime;
 extern unsigned long lastYawTime;
 extern float alpha;
+
 float getPitchAngle();
-float getRollAngle();
+float getRollAngle();   
 float getYawAngle();
 void calibrateYaw();

@@ -1,60 +1,107 @@
+#include <Servo.h>
 #include "wifi_state.h"
 
-namespace Elem {
-const int mainEnable = 4;
-const int mainIn1 = 26;
-const int mainIn2 = 27;
+const int SERVO1_PIN  = 6;   // must not conflict with servo pins in 5_servos.ino
+const int SERVO2_PIN  = 7;
+const int MOTOR_PWM   = 2;
+const int MOTOR_DIR_A = 22;
+const int MOTOR_DIR_B = 23;
 
-bool motorRunning = false;
-unsigned long motorStartMs = 0;
-unsigned long motorDuration = 0;
+struct FnConfig {
+  Servo*        servo;
+  int           servoAngle;
+  bool          motorForward;
+  unsigned long motorRunMs;
+};
+
+const unsigned long SERVO_SETTLE_MS  = 300;
+const int           SERVO_HOME_ANGLE = 90;
+const int           MOTOR_SPEED      = 200;
+
+Servo servo1;
+Servo servo2;
+
+FnConfig fnTable[] = {
+  { &servo1, 110, true,  8000 },  // RAMP_DOWN  (0)
+  { &servo1, 110, false, 8000 },  // RAMP_UP    (1)
+  { &servo2,  70, true,  8000 },  // GEAR_DOWN  (2)
+  { &servo2,  70, false, 8000 },  // GEAR_UP    (3)
+  { &servo2, 110, true,  8000 },  // CABIN_DOWN (4)
+  { &servo2, 110, false, 8000 },  // CABIN_UP   (5)
+};
+
+enum State { IDLE, SERVO_MOVING, MOTOR_RUNNING, SERVO_RETURNING };
+State      state          = IDLE;
+FunctionID activeFn       = FN_NONE;
+FunctionID lastExecutedFn = FN_NONE;  // ← never reset; prevents re-trigger
+unsigned long stateStart  = 0;
+
+void motorStart(bool forward) {
+  digitalWrite(MOTOR_DIR_A, forward ? HIGH : LOW);
+  digitalWrite(MOTOR_DIR_B, forward ? LOW  : HIGH);
+  analogWrite(MOTOR_PWM, MOTOR_SPEED);
 }
 
-static bool prevGear = false;
-static bool prevRamp = false;
-static bool prevCabin = false;
-
-static void setMotor(bool forward, unsigned long durationMs) {
-  if (Elem::motorRunning) return;
-  Elem::motorRunning = true;
-  Elem::motorStartMs = millis();
-  Elem::motorDuration = durationMs;
-  analogWrite(Elem::mainEnable, 255);
-  digitalWrite(Elem::mainIn1, forward ? HIGH : LOW);
-  digitalWrite(Elem::mainIn2, forward ? LOW : HIGH);
+void motorStop() {
+  digitalWrite(MOTOR_DIR_A, LOW);
+  digitalWrite(MOTOR_DIR_B, LOW);
+  analogWrite(MOTOR_PWM, 0);
 }
 
-static void stopMotor() {
-  Elem::motorRunning = false;
-  analogWrite(Elem::mainEnable, 0);
-  digitalWrite(Elem::mainIn1, LOW);
-  digitalWrite(Elem::mainIn2, LOW);
-}
-
-bool setupElements() {
-  pinMode(Elem::mainEnable, OUTPUT);
-  pinMode(Elem::mainIn1, OUTPUT);
-  pinMode(Elem::mainIn2, OUTPUT);
-  return true;
+void setupElements() {
+  servo1.attach(SERVO1_PIN);
+  servo2.attach(SERVO2_PIN);
+  servo1.write(SERVO_HOME_ANGLE);
+  servo2.write(SERVO_HOME_ANGLE);
+  pinMode(MOTOR_PWM,   OUTPUT);
+  pinMode(MOTOR_DIR_A, OUTPUT);
+  pinMode(MOTOR_DIR_B, OUTPUT);
+  motorStop();
 }
 
 void loopElements() {
-  if (Elem::motorRunning && millis() - Elem::motorStartMs >= Elem::motorDuration)
-    stopMotor();
+  unsigned long now = millis();
 
-  if (wElement.gear != prevGear) {
-    setGears();
-    prevGear = wElement.gear;
-    setMotor(wElement.gear, 8000);
-  }
-  if (wElement.ramp != prevRamp) {
-    setRamp();
-    prevRamp = wElement.ramp;
-    setMotor(wElement.ramp, 4000);
-  }
-  if (wElement.cabin != prevCabin) {
-    setCabin();
-    prevCabin = wElement.cabin;
-    setMotor(wElement.cabin, 4300);
+  switch (state) {
+
+    case IDLE:
+      // Ignore no-command and anything we already ran
+      if (wElement.functionId == FN_NONE)            return;
+      if (wElement.functionId == lastExecutedFn)     return;  // ← KEY FIX
+
+      activeFn   = wElement.functionId;
+      stateStart = now;
+      fnTable[activeFn].servo->write(fnTable[activeFn].servoAngle);
+      state = SERVO_MOVING;
+      Serial.print("Starting function: ");
+      Serial.println(activeFn);
+      break;
+
+    case SERVO_MOVING:
+      if (now - stateStart >= SERVO_SETTLE_MS) {
+        motorStart(fnTable[activeFn].motorForward);
+        stateStart = now;
+        state = MOTOR_RUNNING;
+      }
+      break;
+
+    case MOTOR_RUNNING:
+      if (now - stateStart >= fnTable[activeFn].motorRunMs) {
+        motorStop();
+        fnTable[activeFn].servo->write(SERVO_HOME_ANGLE);
+        stateStart = now;
+        state = SERVO_RETURNING;
+      }
+      break;
+
+    case SERVO_RETURNING:
+      if (now - stateStart >= SERVO_SETTLE_MS) {
+        lastExecutedFn = activeFn;  // ← remember what we just did
+        activeFn       = FN_NONE;
+        state          = IDLE;
+      }
+      break;
+
+    default: break;
   }
 }

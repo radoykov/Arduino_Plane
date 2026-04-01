@@ -8,7 +8,7 @@ const float stationaryThreshold = 0.5;
 void calibrateYaw()
 {
   float sum = 0;
-  const int N = 200; // number of samples
+  const int N = 200;
 
   for (int i = 0; i < N; i++)
   {
@@ -33,7 +33,7 @@ float getYawAngle()
   float dt = (now - lastYawTime) / 1e6;
   lastYawTime = now;
 
-  movement.update();
+  // movement.update() is called once externally before all angle reads
 
   float gyroZ = movement.getYaw();
 
@@ -44,10 +44,8 @@ float getYawAngle()
   static float yaw = 0;
   yaw += correctedZ * dt;
 
-  if (yaw > 180)
-    yaw -= 360;
-  if (yaw < -180)
-    yaw += 360;
+  if (yaw > 180)  yaw -= 360;
+  if (yaw < -180) yaw += 360;
 
   return yaw;
 }

@@ -31,29 +31,32 @@ void parsePacket(char *data)
   {
     sscanf(data + 5, "%d", &v);
     wElement.gear = (bool)v;
+    wElement.functionId = (bool)v ? FunctionID::GEAR_UP : FunctionID::GEAR_DOWN;
     return;
   }
   if (strncmp(data, "FLAP:", 5) == 0)
 {
     sscanf(data + 5, "%d", &v);    
-    wElement.flap = v;         
+    wElement.flap = v;
     return;
 }
   if (strncmp(data, "RAMP:", 5) == 0)
   {
     sscanf(data + 5, "%d", &v);
     wElement.ramp = (bool)v;
+    wElement.functionId = (bool)v ? FunctionID::RAMP_UP : FunctionID::RAMP_DOWN;
     return;
   }
   if (strncmp(data, "CABIN:", 6) == 0)
   {
     sscanf(data + 6, "%d", &v);
     wElement.cabin = (bool)v;
+    wElement.functionId = (bool)v ? FunctionID::CABIN_UP : FunctionID::CABIN_DOWN;
     return;
   }
 }
 
-bool setupWifi()
+void setupWifi()
 {
   Serial.println("Starting AP...");
   WiFi.beginAP(AP_SSID, AP_PASS);
@@ -64,7 +67,6 @@ bool setupWifi()
     if (millis() - start > 10000)
     {
       Serial.println("AP failed!");
-      return false;
     }
   }
 
@@ -72,7 +74,6 @@ bool setupWifi()
   Serial.print("Giga IP: ");
   Serial.println(WiFi.localIP());
   Serial.println("Ready.");
-  return true;
 }
 
 void loopWifi()

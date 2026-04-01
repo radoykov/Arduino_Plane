@@ -1,28 +1,35 @@
 #pragma once
 #include <Servo.h>
 
-// Servo state
 struct ServoState {
-  int pitch = 0;  
+  int pitch = 0;
   int roll  = 0;
   int yaw   = 0;
 };
 
-// Engine state
 struct EngineState {
-  int  left  = 0;  // 0–255  PWM value
-  int  right = 0;  // 0–255  PWM value
+  int left  = 0;
+  int right = 0;
 };
 
-// Element (gear / cabin / ramp) state
+enum FunctionID {
+  FN_NONE    = -1,
+  RAMP_DOWN  =  0,
+  RAMP_UP    =  1,
+  GEAR_DOWN  =  2,
+  GEAR_UP    =  3,
+  CABIN_DOWN =  4,
+  CABIN_UP   =  5
+};
+
 struct ElementState {
-  bool gear  = false;  // false = down,  true = up
-  bool ramp  = false;  // false = closed, true = open
-  bool cabin = false;  // false = closed, true = open
-  int flap = 1; // 1 , 2 , 3
+  bool gear   = false;
+  bool ramp   = false;
+  bool cabin  = false;
+  FunctionID functionId = FN_NONE;
+  int flap = 0;  // 0–4  (5 positions)
 };
 
-// Single global instances
 extern ServoState   wServo;
 extern EngineState  wEngine;
 extern ElementState wElement;
@@ -31,3 +38,4 @@ extern void setRamp();
 extern void setBlades();
 extern void setGears();
 extern void setCabin();
+extern void onMotorStopped();

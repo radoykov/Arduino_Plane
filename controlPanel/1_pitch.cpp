@@ -3,21 +3,21 @@
 float getPitchAngle()
 {
   unsigned long currentTime = micros();
-  float duration = (currentTime - lastPitchTime) / 1e6; // seconds
+  float duration = (currentTime - lastPitchTime) / 1e6;
   lastPitchTime = currentTime;
 
-  movement.update();
+  float pitch = movement.getPitch();
 
-  float pitch = movement.getPitch(); // gyro pitch rate (°/s)
-
-  // integrate gyro pitch rate
+  static bool initialized = false;
   static double degrees = 0;
+  if (!initialized) {
+    degrees = atan2(movement.getX(), movement.getZ()) * RAD_TO_DEG;
+    initialized = true;
+  }
+
   degrees += pitch * duration;
 
-  // get accelerometer-based pitch angle (gravity reference)
   float angle = atan2(movement.getX(), movement.getZ()) * RAD_TO_DEG;
-
-  // complementary filter: blend gyro integration with accel reference
   degrees = alpha * degrees + (1 - alpha) * angle;
   return degrees;
 }
