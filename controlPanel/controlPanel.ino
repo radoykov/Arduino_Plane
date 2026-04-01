@@ -23,11 +23,11 @@ int currentScreen = 0;
 
 int engineValues[2] = {0, 0};
 int engineCursor = 0;
-bool updownState[5] = {false, false, false, false, false};
+bool updownState[5] = {false, false, false, true, false};
 int flapSelected = 0;
 
 int prevEngineValues[2] = {-1, -1};
-bool prevUpdown[5] = {false, false, false, false, false};
+bool prevUpdown[5] = {false, false, false, true, false};
 int prevFlapSelected = 0;
 
 bool lastPressed = false;

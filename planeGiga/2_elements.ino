@@ -22,12 +22,12 @@ Servo servo1;
 Servo servo2;
 
 FnConfig fnTable[] = {
-  { &servo1, 110, true,  8000 },  // RAMP_DOWN  (0)
-  { &servo1, 110, false, 8000 },  // RAMP_UP    (1)
-  { &servo2,  70, true,  8000 },  // GEAR_DOWN  (2)
-  { &servo2,  70, false, 8000 },  // GEAR_UP    (3)
-  { &servo2, 110, true,  8000 },  // CABIN_DOWN (4)
-  { &servo2, 110, false, 8000 },  // CABIN_UP   (5)
+  { &servo1, 110, false,  3000 },  // RAMP_DOWN  (0)
+  { &servo1, 110, true, 3100 },  // RAMP_UP    (1)
+  { &servo2,  70, true,  5600 },  // GEAR_DOWN  (2)
+  { &servo2,  70, false, 5650 },  // GEAR_UP    (3)
+  { &servo2, 110, true,  2950 },  // CABIN_DOWN (4)
+  { &servo2, 110, false, 3050 },  // CABIN_UP   (5)
 };
 
 enum State { IDLE, SERVO_MOVING, MOTOR_RUNNING, SERVO_RETURNING };

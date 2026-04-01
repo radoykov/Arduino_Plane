@@ -24,7 +24,7 @@ enum FunctionID {
 
 struct ElementState {
   bool gear   = false;
-  bool ramp   = false;
+  bool ramp   = true;
   bool cabin  = false;
   FunctionID functionId = FN_NONE;
   int flap = 0;  // 0–4  (5 positions)
