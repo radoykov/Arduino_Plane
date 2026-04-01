@@ -36,8 +36,8 @@ void loopEngines() {
     digitalWrite(Eng::leftIn2, LOW);
   } else {
     //setBlades();
-    digitalWrite(Eng::leftIn1, LOW);
-    digitalWrite(Eng::leftIn2, HIGH);
+    digitalWrite(Eng::leftIn1, HIGH);
+    digitalWrite(Eng::leftIn2, LOW);
   }
 
   if (val2 <= MIN_NUM) {
@@ -45,8 +45,8 @@ void loopEngines() {
     digitalWrite(Eng::rightIn2, LOW);
   } else {
     //setBlades();
-    digitalWrite(Eng::rightIn1, HIGH);
-    digitalWrite(Eng::rightIn2, LOW);
+    digitalWrite(Eng::rightIn1, LOW);
+    digitalWrite(Eng::rightIn2, HIGH);
   }
 
   analogWrite(Eng::leftEnable,  val1);

@@ -11,13 +11,13 @@ float getPitchAngle()
   static bool initialized = false;
   static double degrees = 0;
   if (!initialized) {
-    degrees = atan2(movement.getX(), movement.getZ()) * RAD_TO_DEG;
+    degrees = atan2(-movement.getX(), movement.getZ()) * RAD_TO_DEG;
     initialized = true;
   }
 
   degrees += pitch * duration;
 
-  float angle = atan2(movement.getX(), movement.getZ()) * RAD_TO_DEG;
+  float angle = atan2(-movement.getX(), movement.getZ()) * RAD_TO_DEG;
   degrees = alpha * degrees + (1 - alpha) * angle;
   return degrees;
 }
