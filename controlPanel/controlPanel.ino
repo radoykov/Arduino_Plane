@@ -14,6 +14,10 @@ ModulinoMovement movement;
 ModulinoKnob knob;
 ArduinoLEDMatrix matrix;
 
+const int PIN_SW_GEAR = 11;
+const int PIN_SW_RAMP = 13;
+const int PIN_SW_CABIN = 10;
+
 float alpha;
 unsigned long lastPitchTime, lastRollTime, lastYawTime;
 
@@ -39,6 +43,13 @@ unsigned long lastImuSendTime = 0;
 const unsigned long IMU_SEND_INTERVAL = 100;
 
 int lastKnobPos = 0;
+
+void readSwitches()
+{
+  updownState[1] = digitalRead(PIN_SW_GEAR)  == LOW;
+  updownState[3] = digitalRead(PIN_SW_RAMP)  == HIGH;
+  updownState[4] = digitalRead(PIN_SW_CABIN) == LOW;
+}
 
 void matrixScroll(const char *msg)
 {
@@ -92,7 +103,7 @@ void drawFlaps()
   matrix.clear();
   matrix.stroke(0xFFFFFFFF);
   matrix.textFont(Font_4x6);
-  char d[2] = {(char)('0' + flapSelected + 1), '\0'}; // displays 1–4
+  char d[2] = {(char)('0' + flapSelected + 1), '\0'};
   matrix.beginText(4, 1, 0xFFFFFF);
   matrix.print(d);
   matrix.endText();
@@ -105,21 +116,11 @@ void drawCurrent()
 {
   switch (currentScreen)
   {
-  case 0:
-    drawEngines();
-    break;
-  case 1:
-    drawUpDown(1);
-    break;
-  case 2:
-    drawFlaps();
-    break;
-  case 3:
-    drawUpDown(3);
-    break;
-  case 4:
-    drawUpDown(4);
-    break;
+  case 0: drawEngines();  break;
+  case 1: drawUpDown(1);  break;
+  case 2: drawFlaps();    break;
+  case 3: drawUpDown(3);  break;
+  case 4: drawUpDown(4);  break;
   }
 }
 
@@ -155,7 +156,6 @@ void sendPacket(const char *buf)
 void sendPitchRollYaw()
 {
   movement.update();
-
   char buf[64];
   snprintf(buf, sizeof(buf), "PITCH:%d|ROLL:%d|YAW:%d",
            (int)getPitchAngle(), (int)getRollAngle(), (int)getYawAngle());
@@ -231,18 +231,10 @@ void onSingleClick()
 {
   switch (currentScreen)
   {
-  case 0:
-    engineCursor = 1 - engineCursor;
-    break;
-  case 1:
-    updownState[1] = !updownState[1];
-    break;
-  case 3:
-    updownState[3] = !updownState[3];
-    break;
-  case 4:
-    updownState[4] = !updownState[4];
-    break;
+  case 0: engineCursor = 1 - engineCursor;   break;
+  case 1: updownState[1] = !updownState[1];  break;
+  case 3: updownState[3] = !updownState[3];  break;
+  case 4: updownState[4] = !updownState[4];  break;
   }
   drawCurrent();
 }
@@ -263,12 +255,9 @@ void onTripleClick()
 
 void dispatchClicks(int count)
 {
-  if (count == 1)
-    onSingleClick();
-  else if (count == 2)
-    onDoubleClick();
-  else if (count >= 3)
-    onTripleClick();
+  if (count == 1)      onSingleClick();
+  else if (count == 2) onDoubleClick();
+  else if (count >= 3) onTripleClick();
 }
 
 bool setupMovement()
@@ -276,7 +265,7 @@ bool setupMovement()
   Modulino.begin();
   movement.begin();
   lastPitchTime = lastRollTime = lastYawTime = micros();
-  alpha = 0.90; // lowered from 0.95 for faster accel correction
+  alpha = 0.90;
   calibrateYaw();
   return true;
 }
@@ -287,8 +276,10 @@ void setup()
   setupMovement();
   knob.begin();
   matrix.begin();
-  while (!connectWiFi())
-    ;
+  pinMode(PIN_SW_GEAR,  INPUT_PULLUP);
+  pinMode(PIN_SW_RAMP,  INPUT_PULLUP);
+  pinMode(PIN_SW_CABIN, INPUT_PULLUP);
+  while (!connectWiFi());
   lastKnobPos = knob.get();
   matrixScroll(screenNames[currentScreen]);
   drawCurrent();
@@ -300,6 +291,8 @@ void loop()
   bool pressed = knob.isPressed();
   int knobPos = knob.get();
   unsigned long now = millis();
+
+  readSwitches();
 
   if (!pressed && lastPressed)
   {
@@ -319,12 +312,8 @@ void loop()
     lastKnobPos = knobPos;
     switch (currentScreen)
     {
-    case 0:
-      engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9);
-      break;
-    case 2:
-      flapSelected = constrain(flapSelected + delta, 0, 3);
-      break;
+    case 0: engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9); break;
+    case 2: flapSelected = constrain(flapSelected + delta, 0, 3); break;
     }
     drawCurrent();
   }
