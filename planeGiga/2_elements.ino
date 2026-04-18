@@ -23,7 +23,7 @@ Servo servo2;
 
 FnConfig fnTable[] = {
   { &servo1, 115, false,  3000 },  // RAMP_DOWN  (0)
-  { &servo1, 115, true, 3100 },  // RAMP_UP    (1)
+  { &servo1, 115, true, 3000 },  // RAMP_UP    (1)
   { &servo2,  70, true,  5600 },  // GEAR_DOWN  (2)
   { &servo2,  70, false, 5650 },  // GEAR_UP    (3)
   { &servo2, 110, true,  2950 },  // CABIN_DOWN (4)

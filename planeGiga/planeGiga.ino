@@ -10,14 +10,15 @@ void setupLeds();
 void loopLeds();
 void setupFlaps();
 void loopFlaps();
-//void setupClutch();   
+void setupStepper();
+void updateStepperLogic();
 
 void setup() {
   Serial.begin(115200);
 
   setupWifi();
+  setupStepper();
   setupServo();
-  //setupClutch();    
   setupEngines();
   setupElements();
   setupFlaps();
@@ -26,9 +27,10 @@ void setup() {
 
 void loop() {
   loopWifi();
+  updateStepperLogic();
   loopServo();
   loopEngines();
-  loopElements();  
+  loopElements();
   loopFlaps();
   loopLeds();
 }

@@ -27,12 +27,15 @@ struct ElementState {
   bool ramp   = true;
   bool cabin  = false;
   FunctionID functionId = FN_NONE;
-  int flap = 0;  // 0–4  (5 positions)
+  int flap = 0;  // 0-3
 };
 
 extern ServoState   wServo;
 extern EngineState  wEngine;
 extern ElementState wElement;
+
+extern bool wifiConnected;  // true once AP is up and receiving
+extern bool wStand;         // STAND switch state from controller
 
 extern void setRamp();
 extern void setBlades();

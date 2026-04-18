@@ -5,6 +5,8 @@
 ServoState wServo;
 EngineState wEngine;
 ElementState wElement;
+bool wifiConnected = false;
+bool wStand = false;
 
 const char *AP_SSID = "ArduinoGigaWifi";
 const char *AP_PASS = "pesho123";
@@ -31,27 +33,33 @@ void parsePacket(char *data)
   {
     sscanf(data + 5, "%d", &v);
     wElement.gear = (bool)v;
-    wElement.functionId = (bool)v ? FunctionID::GEAR_UP : FunctionID::GEAR_DOWN;
+    wElement.functionId = v ? FunctionID::GEAR_UP : FunctionID::GEAR_DOWN;
     return;
   }
   if (strncmp(data, "FLAP:", 5) == 0)
-{
-    sscanf(data + 5, "%d", &v);    
+  {
+    sscanf(data + 5, "%d", &v);
     wElement.flap = v;
     return;
-}
+  }
   if (strncmp(data, "RAMP:", 5) == 0)
   {
     sscanf(data + 5, "%d", &v);
     wElement.ramp = (bool)v;
-    wElement.functionId = (bool)v ? FunctionID::RAMP_UP : FunctionID::RAMP_DOWN;
+    wElement.functionId = v ? FunctionID::RAMP_UP : FunctionID::RAMP_DOWN;
     return;
   }
   if (strncmp(data, "CABIN:", 6) == 0)
   {
     sscanf(data + 6, "%d", &v);
     wElement.cabin = (bool)v;
-    wElement.functionId = (bool)v ? FunctionID::CABIN_UP : FunctionID::CABIN_DOWN;
+    wElement.functionId = v ? FunctionID::CABIN_UP : FunctionID::CABIN_DOWN;
+    return;
+  }
+  if (strncmp(data, "STAND:", 6) == 0)
+  {
+    sscanf(data + 6, "%d", &v);
+    wStand = (bool)v;
     return;
   }
 }
@@ -67,10 +75,12 @@ void setupWifi()
     if (millis() - start > 10000)
     {
       Serial.println("AP failed!");
+      return;
     }
   }
 
   udp.begin(UDP_PORT);
+  wifiConnected = true;
   Serial.print("Giga IP: ");
   Serial.println(WiFi.localIP());
   Serial.println("Ready.");
@@ -78,6 +88,9 @@ void setupWifi()
 
 void loopWifi()
 {
+  if (!wifiConnected)
+    return;
+
   int packetSize = udp.parsePacket();
   if (packetSize <= 0)
     return;

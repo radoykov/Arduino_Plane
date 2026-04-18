@@ -14,9 +14,10 @@ ModulinoMovement movement;
 ModulinoKnob knob;
 ArduinoLEDMatrix matrix;
 
-const int PIN_SW_GEAR = 11;
-const int PIN_SW_RAMP = 13;
 const int PIN_SW_CABIN = 10;
+const int PIN_SW_GEAR  = 11;
+const int PIN_SW_STAND = 12;
+const int PIN_SW_RAMP  = 13;
 
 float alpha;
 unsigned long lastPitchTime, lastRollTime, lastYawTime;
@@ -27,11 +28,11 @@ int currentScreen = 0;
 
 int engineValues[2] = {0, 0};
 int engineCursor = 0;
-bool updownState[5] = {false, false, false, true, false};
+bool updownState[6] = {false, false, false, true, false, false};
 int flapSelected = 0;
 
 int prevEngineValues[2] = {-1, -1};
-bool prevUpdown[5] = {false, false, false, true, false};
+bool prevUpdown[6] = {false, false, false, true, false, false};
 int prevFlapSelected = 0;
 
 bool lastPressed = false;
@@ -44,11 +45,16 @@ const unsigned long IMU_SEND_INTERVAL = 100;
 
 int lastKnobPos = 0;
 
+// Tracks whether button last toggled each channel (true) or switch controls it (false)
+bool btnOverride[6] = {false, false, false, false, false, false};
+
 void readSwitches()
 {
-  updownState[1] = digitalRead(PIN_SW_GEAR)  == LOW;
-  updownState[3] = digitalRead(PIN_SW_RAMP)  == HIGH;
-  updownState[4] = digitalRead(PIN_SW_CABIN) == LOW;
+  // Only update from switch if button hasn't overridden that channel
+  if (!btnOverride[1]) updownState[1] = digitalRead(PIN_SW_GEAR)  == LOW;
+  if (!btnOverride[3]) updownState[3] = digitalRead(PIN_SW_RAMP)  == HIGH;
+  if (!btnOverride[4]) updownState[4] = digitalRead(PIN_SW_CABIN) == LOW;
+  updownState[5] = digitalRead(PIN_SW_STAND) == LOW;
 }
 
 void matrixScroll(const char *msg)
@@ -116,12 +122,19 @@ void drawCurrent()
 {
   switch (currentScreen)
   {
-  case 0: drawEngines();  break;
-  case 1: drawUpDown(1);  break;
-  case 2: drawFlaps();    break;
-  case 3: drawUpDown(3);  break;
-  case 4: drawUpDown(4);  break;
+  case 0: drawEngines();   break;
+  case 1: drawUpDown(1);   break;
+  case 2: drawFlaps();     break;
+  case 3: drawUpDown(3);   break;
+  case 4: drawUpDown(4);   break;
   }
+}
+
+void sendStand()
+{
+  char buf[16];
+  snprintf(buf, sizeof(buf), "STAND:%d", updownState[5] ? 1 : 0);
+  sendPacket(buf);
 }
 
 bool connectWiFi()
@@ -225,16 +238,32 @@ void sendChangedEvents()
     prevFlapSelected = flapSelected;
     sendFlap();
   }
+  if (updownState[5] != prevUpdown[5])
+  {
+    prevUpdown[5] = updownState[5];
+    sendStand();
+  }
 }
 
 void onSingleClick()
 {
   switch (currentScreen)
   {
-  case 0: engineCursor = 1 - engineCursor;   break;
-  case 1: updownState[1] = !updownState[1];  break;
-  case 3: updownState[3] = !updownState[3];  break;
-  case 4: updownState[4] = !updownState[4];  break;
+  case 0:
+    engineCursor = 1 - engineCursor;
+    break;
+  case 1:
+    btnOverride[1] = true;
+    updownState[1] = !updownState[1];
+    break;
+  case 3:
+    btnOverride[3] = true;
+    updownState[3] = !updownState[3];
+    break;
+  case 4:
+    btnOverride[4] = true;
+    updownState[4] = !updownState[4];
+    break;
   }
   drawCurrent();
 }
@@ -279,7 +308,9 @@ void setup()
   pinMode(PIN_SW_GEAR,  INPUT_PULLUP);
   pinMode(PIN_SW_RAMP,  INPUT_PULLUP);
   pinMode(PIN_SW_CABIN, INPUT_PULLUP);
-  while (!connectWiFi());
+  pinMode(PIN_SW_STAND, INPUT_PULLUP);
+  while (!connectWiFi())
+    ;
   lastKnobPos = knob.get();
   matrixScroll(screenNames[currentScreen]);
   drawCurrent();
@@ -289,8 +320,17 @@ void setup()
 void loop()
 {
   bool pressed = knob.isPressed();
-  int knobPos = knob.get();
+  int knobPos  = knob.get();
   unsigned long now = millis();
+
+  // If switch is moved, release button override so switch takes back control
+  bool gearSw  = digitalRead(PIN_SW_GEAR)  == LOW;
+  bool rampSw  = digitalRead(PIN_SW_RAMP)  == HIGH;
+  bool cabinSw = digitalRead(PIN_SW_CABIN) == LOW;
+
+  if (gearSw  != updownState[1] && btnOverride[1]) btnOverride[1] = false;
+  if (rampSw  != updownState[3] && btnOverride[3]) btnOverride[3] = false;
+  if (cabinSw != updownState[4] && btnOverride[4]) btnOverride[4] = false;
 
   readSwitches();
 
@@ -312,8 +352,12 @@ void loop()
     lastKnobPos = knobPos;
     switch (currentScreen)
     {
-    case 0: engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9); break;
-    case 2: flapSelected = constrain(flapSelected + delta, 0, 3); break;
+    case 0:
+      engineValues[engineCursor] = constrain(engineValues[engineCursor] + delta, 0, 9);
+      break;
+    case 2:
+      flapSelected = constrain(flapSelected + delta, 0, 3);
+      break;
     }
     drawCurrent();
   }
