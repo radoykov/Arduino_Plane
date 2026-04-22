@@ -14,8 +14,6 @@ void setupStepper();
 void updateStepperLogic();
 
 void setup() {
-  Serial.begin(115200);
-
   setupWifi();
   setupStepper();
   setupServo();
