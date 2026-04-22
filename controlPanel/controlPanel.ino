@@ -45,16 +45,20 @@ const unsigned long IMU_SEND_INTERVAL = 100;
 
 int lastKnobPos = 0;
 
-// Tracks whether button last toggled each channel (true) or switch controls it (false)
-bool btnOverride[6] = {false, false, false, false, false, false};
-
-void readSwitches()
+// Read switches and return true if anything changed
+bool readSwitches()
 {
-  // Only update from switch if button hasn't overridden that channel
-  if (!btnOverride[1]) updownState[1] = digitalRead(PIN_SW_GEAR)  == LOW;
-  if (!btnOverride[3]) updownState[3] = digitalRead(PIN_SW_RAMP)  == HIGH;
-  if (!btnOverride[4]) updownState[4] = digitalRead(PIN_SW_CABIN) == LOW;
-  updownState[5] = digitalRead(PIN_SW_STAND) == LOW;
+  bool changed = false;
+  bool g = digitalRead(PIN_SW_GEAR)  == LOW;
+  bool r = digitalRead(PIN_SW_RAMP)  == HIGH;
+  bool c = digitalRead(PIN_SW_CABIN) == LOW;
+  bool s = digitalRead(PIN_SW_STAND) == LOW;
+
+  if (g != updownState[1]) { updownState[1] = g; changed = true; }
+  if (r != updownState[3]) { updownState[3] = r; changed = true; }
+  if (c != updownState[4]) { updownState[4] = c; changed = true; }
+  if (s != updownState[5]) { updownState[5] = s; changed = true; }
+  return changed;
 }
 
 void matrixScroll(const char *msg)
@@ -98,7 +102,7 @@ void drawUpDown(int idx)
   matrix.stroke(0xFFFFFFFF);
   matrix.textFont(Font_4x6);
   matrix.beginText(0, 1, 0xFFFFFF);
-  matrix.print(updownState[idx] ? "UP" : "DN");
+  matrix.print(updownState[idx] ? "UP" : "DN"); // always shows real switch state
   matrix.endText();
   matrix.endDraw();
 }
@@ -122,11 +126,11 @@ void drawCurrent()
 {
   switch (currentScreen)
   {
-  case 0: drawEngines();   break;
-  case 1: drawUpDown(1);   break;
-  case 2: drawFlaps();     break;
-  case 3: drawUpDown(3);   break;
-  case 4: drawUpDown(4);   break;
+  case 0: drawEngines(); break;
+  case 1: drawUpDown(1); break;
+  case 2: drawFlaps();   break;
+  case 3: drawUpDown(3); break;
+  case 4: drawUpDown(4); break;
   }
 }
 
@@ -253,15 +257,12 @@ void onSingleClick()
     engineCursor = 1 - engineCursor;
     break;
   case 1:
-    btnOverride[1] = true;
-    updownState[1] = !updownState[1];
+    updownState[1] = !updownState[1]; // button also toggles real state
     break;
   case 3:
-    btnOverride[3] = true;
     updownState[3] = !updownState[3];
     break;
   case 4:
-    btnOverride[4] = true;
     updownState[4] = !updownState[4];
     break;
   }
@@ -323,16 +324,12 @@ void loop()
   int knobPos  = knob.get();
   unsigned long now = millis();
 
-  // If switch is moved, release button override so switch takes back control
-  bool gearSw  = digitalRead(PIN_SW_GEAR)  == LOW;
-  bool rampSw  = digitalRead(PIN_SW_RAMP)  == HIGH;
-  bool cabinSw = digitalRead(PIN_SW_CABIN) == LOW;
-
-  if (gearSw  != updownState[1] && btnOverride[1]) btnOverride[1] = false;
-  if (rampSw  != updownState[3] && btnOverride[3]) btnOverride[3] = false;
-  if (cabinSw != updownState[4] && btnOverride[4]) btnOverride[4] = false;
-
-  readSwitches();
+  // readSwitches returns true if any switch changed → redraw immediately
+  bool switchChanged = readSwitches();
+  if (switchChanged)
+  {
+    drawCurrent(); // matrix instantly reflects new switch state
+  }
 
   if (!pressed && lastPressed)
   {
