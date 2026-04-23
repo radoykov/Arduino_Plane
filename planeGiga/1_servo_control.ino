@@ -8,14 +8,14 @@ const int enaPin  = 51;
 const long MAX_STEP_POS = 400;
 const long MIN_STEP_POS = -400;
 
-const unsigned long SPEED_MIN_US = 4000;    // fastest
-const unsigned long SPEED_MAX_US = 20000;  // slowest
+const unsigned long SPEED_MIN_US = 9000;    // fastest
+const unsigned long SPEED_MAX_US = 60000;  // slowest
 
 const float ROLL_DEADZONE = 5.0f;
 const float YAW_DEADZONE  = 8.0f;
 const float ROLL_MAX      = 40.0f;
 const float YAW_MAX       = 180.0f;
-const float YAW_WEIGHT    = 0.3f;  // yaw adds 30% on top of roll
+const float YAW_WEIGHT    = 0.7f;  // yaw adds 30% on top of roll
 
 const int           WRAP_THRESHOLD  = 90;
 const unsigned long WRAP_HOLDOFF_MS = 300;
@@ -70,7 +70,7 @@ void updateStepperLogic()
   if (t < 0.01f) return;
 
   // Drive direction
-  float turnDrive = rollInput + yawInput * YAW_WEIGHT;
+ float turnDrive = -rollInput + yawInput * YAW_WEIGHT;
   if (currentStepPos >= MAX_STEP_POS && turnDrive > 0) return;
   if (currentStepPos <= MIN_STEP_POS && turnDrive < 0) return;
 
