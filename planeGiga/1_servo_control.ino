@@ -1,21 +1,23 @@
 #include "wifi_state.h"
 #include <math.h>
 
-const int stepPin = 52;
-const int dirPin  = 53;
-const int enaPin  = 51;
+const int enaPin  = 51;//orange
+const int stepPin = 52;//grey
+const int dirPin  = 53;//green
 
-const long MAX_STEP_POS = 400;
-const long MIN_STEP_POS = -400;
+const long MAX_STEP_POS = 1600;
+const long MIN_STEP_POS = -1600;
 
-const unsigned long SPEED_MIN_US = 9000;    // fastest
-const unsigned long SPEED_MAX_US = 60000;  // slowest
+const unsigned long SPEED_MIN_US = 2000;
+const unsigned long SPEED_MAX_US = 5000;
 
-const float ROLL_DEADZONE = 5.0f;
-const float YAW_DEADZONE  = 8.0f;
-const float ROLL_MAX      = 40.0f;
-const float YAW_MAX       = 180.0f;
-const float YAW_WEIGHT    = 0.7f;  // yaw adds 30% on top of roll
+const float ROLL_DEADZONE        = 5.0f;
+const float YAW_DEADZONE         = 8.0f;
+const float ROLL_MAX             = 40.0f;
+const float YAW_MAX              = 180.0f;
+const float YAW_WEIGHT           = 0.9f;
+const float ENGINE_DIFF_WEIGHT   = 0.5f;
+const int   ENGINE_DEADZONE      = 5;
 
 const int           WRAP_THRESHOLD  = 90;
 const unsigned long WRAP_HOLDOFF_MS = 300;
@@ -24,8 +26,7 @@ long          currentStepPos = 0;
 unsigned long lastStepTime   = 0;
 bool          stepPinHigh    = false;
 
-void setupStepper()
-{
+void setupStepper() {
   pinMode(stepPin, OUTPUT);
   pinMode(dirPin,  OUTPUT);
   pinMode(enaPin,  OUTPUT);
@@ -59,22 +60,29 @@ void updateStepperLogic()
   float roll = (float)wServo.roll;
 
   // Deadzone
-  float rollInput = (fabs(roll) < ROLL_DEADZONE) ? 0.0f : roll;
-  float yawInput  = (fabs(effectiveYaw) < YAW_DEADZONE) ? 0.0f : effectiveYaw;
+  float rollInput   = (fabs(roll)         < ROLL_DEADZONE) ? 0.0f : roll;
+  float yawInput    = (fabs(effectiveYaw) < YAW_DEADZONE)  ? 0.0f : effectiveYaw;
 
-  // Linear 0..1 for each axis
-  float rollT = constrain(fabs(rollInput) / ROLL_MAX, 0.0f, 1.0f);
-  float yawT  = constrain(fabs(yawInput)  / YAW_MAX,  0.0f, 1.0f) * YAW_WEIGHT;
-  float t     = constrain(rollT + yawT,  0.0f, 1.0f);
+  // Engine differential: left fails → rotates left → positive engineInput = turn right
+  int   engineDiff  = wEngine.right - wEngine.left;
+  float engineInput = (abs(engineDiff) < ENGINE_DEADZONE) ? 0.0f : (float)engineDiff;
+
+  // Normalize all axes linearly to 0..1
+  float rollT   = constrain(fabs(rollInput)   / ROLL_MAX,  0.0f, 1.0f);
+  float yawT    = constrain(fabs(yawInput)    / YAW_MAX,   0.0f, 1.0f);
+  float engineT = constrain(fabs(engineInput) / 100.0f,    0.0f, 1.0f) * ENGINE_DIFF_WEIGHT;
+  float t       = constrain(rollT + yawT * YAW_WEIGHT + engineT, 0.0f, 1.0f);
 
   if (t < 0.01f) return;
 
-  // Drive direction
- float turnDrive = -rollInput + yawInput * YAW_WEIGHT;
+  // Weighted sum — all normalized to [-1..1] before weighting
+  float turnDrive = -(rollInput   / ROLL_MAX)
+                  + (yawInput    / YAW_MAX)  * YAW_WEIGHT
+                  + (engineInput / 100.0f)   * ENGINE_DIFF_WEIGHT;
+
   if (currentStepPos >= MAX_STEP_POS && turnDrive > 0) return;
   if (currentStepPos <= MIN_STEP_POS && turnDrive < 0) return;
 
-  // Linear interval: bigger angle = smaller interval = faster
   unsigned long interval = (unsigned long)(SPEED_MAX_US - t * (SPEED_MAX_US - SPEED_MIN_US));
 
   unsigned long now = micros();

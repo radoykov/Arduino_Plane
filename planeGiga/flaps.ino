@@ -3,7 +3,7 @@
 
 namespace Flap {
   const int enable = 3;
-  const int in1    = 24;   // C1
+  const int in1    = 24;   // C1  
   const int in2    = 25;   // C2
 
   const int PWM_VALUES[4] = { 0, 120, 182, 255 };

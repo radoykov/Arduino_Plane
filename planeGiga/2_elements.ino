@@ -1,7 +1,7 @@
 #include <Servo.h>
 #include "wifi_state.h"
 
-const int SERVO1_PIN  = 6;   // must not conflict with servo pins in 5_servos.ino
+const int SERVO1_PIN  = 6;
 const int SERVO2_PIN  = 7;
 const int MOTOR_PWM   = 2;
 const int MOTOR_DIR_A = 22;
@@ -24,7 +24,7 @@ Servo servo2;
 FnConfig fnTable[] = {
   { &servo1, 115, false,  3000 },  // RAMP_DOWN  (0)
   { &servo1, 115, true, 3000 },  // RAMP_UP    (1)
-  { &servo2,  70, true,  5750 },  // GEAR_DOWN  (2)
+  { &servo2,  70, true,  5780 },  // GEAR_DOWN  (2)
   { &servo2,  70, false, 5650 },  // GEAR_UP    (3)
   { &servo2, 110, true,  2950 },  // CABIN_DOWN (4)
   { &servo2, 110, false, 3050 },  // CABIN_UP   (5)
