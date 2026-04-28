@@ -14,10 +14,10 @@ ModulinoMovement movement;
 ModulinoKnob knob;
 ArduinoLEDMatrix matrix;
 
-const int PIN_SW_CABIN = 10;
-const int PIN_SW_GEAR  = 11;
-const int PIN_SW_STAND = 12;
-const int PIN_SW_RAMP  = 13;
+const int PIN_SW_CABIN = 9;
+const int PIN_SW_GEAR  = 10;
+const int PIN_SW_STAND = 11;
+const int PIN_SW_RAMP  = 12;
 
 float alpha;
 unsigned long lastPitchTime, lastRollTime, lastYawTime;
